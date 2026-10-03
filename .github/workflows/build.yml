@@ -1,0 +1,85 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    name: Test + Build FileOrganizer.exe
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore FileOrganizer.sln
+
+      - name: Run core tests
+        run: dotnet run --project tests/FileOrganizer.Core.Tests/FileOrganizer.Core.Tests.csproj -c Release
+
+      - name: Build (Release)
+        run: dotnet build FileOrganizer.sln -c Release --no-restore
+
+      - name: Publish single-file exe (win-x64, self-contained)
+        run: dotnet publish src/FileOrganizer.App/FileOrganizer.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o publish
+
+      - name: Package app zip
+        shell: pwsh
+        run: |
+          Copy-Item scripts -Destination publish/scripts -Recurse
+          Copy-Item README.md -Destination publish/
+          Compress-Archive -Path publish/* -DestinationPath FileOrganizer-win-x64.zip
+
+      - name: Upload FileOrganizer.exe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fileorganizer-win-x64
+          path: FileOrganizer-win-x64.zip
+          retention-days: 90
+
+  installer:
+    needs: build
+    runs-on: windows-latest
+    name: Build File Organizer Setup.exe (Inno Setup)
+    if: github.event_name != 'pull_request'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Publish single-file exe
+        run: dotnet publish src/FileOrganizer.App/FileOrganizer.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o installer/publish
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { $iscc = "$env:ProgramFiles\Inno Setup 6\ISCC.exe" }
+          & $iscc installer/FileOrganizer.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed with $LASTEXITCODE" }
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: file-organizer-setup
+          path: installer/output/*.exe
+          retention-days: 90
+          if-no-files-found: error
