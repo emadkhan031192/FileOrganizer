@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>FileOrganizer.Core.Tests</RootNamespace>
+    <AssemblyName>FileOrganizer.Core.Tests</AssemblyName>
+    <!-- Deliberately a dependency-free console test runner (no xUnit/NuGet needed),
+         so the core logic can be verified fully offline on any OS. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FileOrganizer.Core\FileOrganizer.Core.csproj" />
+  </ItemGroup>
+
+</Project>
