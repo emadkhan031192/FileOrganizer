@@ -39,28 +39,32 @@ $config = Get-Content $ConfigPath -Raw | ConvertFrom-Json
 $destinations = @($config.Destinations)
 if ($destinations.Count -eq 0) { throw "The config has no destinations yet." }
 
-$menuRoot = "HKCU:\Software\Classes\*\shell\MoveToOrganizer"
+$roots = @(
+    "HKCU:\Software\Classes\*\shell\MoveToOrganizer",
+    "HKCU:\Software\Classes\Directory\shell\MoveToOrganizer"
+)
+foreach ($menuRoot in $roots) {
+    # Reset any previous registration so renamed/removed destinations disappear.
+    Remove-Item $menuRoot -Recurse -Force -ErrorAction SilentlyContinue
 
-# Reset any previous registration so renamed/removed destinations disappear.
-Remove-Item $menuRoot -Recurse -Force -ErrorAction SilentlyContinue
+    New-Item -Path $menuRoot -Force | Out-Null
+    Set-ItemProperty -Path $menuRoot -Name "MUIVerb" -Value "Move to Organizer"
+    Set-ItemProperty -Path $menuRoot -Name "SubCommands" -Value ""
+    Set-ItemProperty -Path $menuRoot -Name "Icon" -Value "`"$ExePath`",0"
 
-New-Item -Path $menuRoot -Force | Out-Null
-Set-ItemProperty -Path $menuRoot -Name "MUIVerb" -Value "Move to Organizer"
-Set-ItemProperty -Path $menuRoot -Name "SubCommands" -Value ""
-Set-ItemProperty -Path $menuRoot -Name "Icon" -Value "`"$ExePath`",0"
-
-New-Item -Path "$menuRoot\shell" -Force | Out-Null
-foreach ($dest in ($destinations | Sort-Object SortOrder)) {
-    $verb = "$menuRoot\shell\MoveTo_$($dest.Id)"
-    New-Item -Path "$verb\command" -Force | Out-Null
-    Set-ItemProperty -Path $verb -Name "MUIVerb" -Value "$($dest.Icon) $($dest.Name)"
-    Set-Item -Path "$verb\command" -Value "`"$ExePath`" --move-to `"$($dest.Id)`" `"%1`""
-    Write-Host "  + $($dest.Name)"
+    New-Item -Path "$menuRoot\shell" -Force | Out-Null
+    foreach ($dest in ($destinations | Sort-Object SortOrder)) {
+        $verb = "$menuRoot\shell\MoveTo_$($dest.Id)"
+        New-Item -Path "$verb\command" -Force | Out-Null
+        Set-ItemProperty -Path $verb -Name "MUIVerb" -Value "$($dest.Icon) $($dest.Name)"
+        Set-Item -Path "$verb\command" -Value "`"$ExePath`" --move-to `"$($dest.Id)`" `"%1`""
+        Write-Host "  + $($dest.Name)"
+    }
+    $addVerb = "$menuRoot\shell\ZZ_AddDestination"
+    New-Item -Path "$addVerb\command" -Force | Out-Null
+    Set-ItemProperty -Path $addVerb -Name "MUIVerb" -Value "+ Add Destination..."
+    Set-Item -Path "$addVerb\command" -Value "`"$ExePath`" --add-destination `"%1`""
 }
-$addVerb = "$menuRoot\shell\ZZ_AddDestination"
-New-Item -Path "$addVerb\command" -Force | Out-Null
-Set-ItemProperty -Path $addVerb -Name "MUIVerb" -Value "+ Add Destination..."
-Set-Item -Path "$addVerb\command" -Value "`"$ExePath`" --add-destination `"%1`""
 
 # Right-click a folder -> add it as a destination.
 $folderKey = "HKCU:\Software\Classes\Directory\shell\OrganizerAddDestination"

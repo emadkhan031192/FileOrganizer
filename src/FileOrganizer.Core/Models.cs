@@ -143,6 +143,26 @@ public sealed class AppPreferences
     public bool IncludeSubfolders { get; set; }
 
     public DateSource OrganizeDateSource { get; set; } = DateSource.Modified;
+
+    // ----- Quick Bar customization (Settings) -----
+
+    /// <summary>Show the single ⚡ ORGANIZE button on the Quick Bar.</summary>
+    public bool ShowOrganizeOnQuickBar { get; set; } = true;
+
+    /// <summary>Show the ✏️ Rename button on the Quick Bar.</summary>
+    public bool ShowRenameOnQuickBar { get; set; } = true;
+
+    /// <summary>Destination buttons show "icon + name" when true, icon only when false.</summary>
+    public bool QuickBarShowLabels { get; set; } = true;
+
+    /// <summary>Quick Bar button size: "S", "M", or "L".</summary>
+    public string QuickBarSize { get; set; } = "M";
+
+    /// <summary>UI theme: "Light" (default) or "Dark".</summary>
+    public string Theme { get; set; } = "Light";
+
+    /// <summary>Accent colour as #RRGGBB used for primary buttons and highlights.</summary>
+    public string AccentHex { get; set; } = "#2563EB";
 }
 
 /// <summary>Everything File Organizer persists locally (destinations, rules, categories, presets, recent folders).</summary>

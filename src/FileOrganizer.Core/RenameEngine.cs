@@ -2,7 +2,7 @@ using System.Globalization;
 
 namespace FileOrganizer.Core;
 
-/// <summary>Batch rename (§7): date stamping, numbering, text operations. Always preview first; never overwrites.</summary>
+/// <summary>Batch rename (§7): date stamping, numbering, text operations. Always preview first; never overwrites. Works on files AND folders.</summary>
 public static class RenameEngine
 {
     public static List<RenamePreviewItem> BuildPreview(IReadOnlyList<string> files, RenameOptions options)
@@ -10,10 +10,12 @@ public static class RenameEngine
         var items = new List<RenamePreviewItem>();
         for (var i = 0; i < files.Count; i++)
         {
-            var source = files[i];
+            var source = files[i].TrimEnd('\\', '/');
+            var isDirectory = Directory.Exists(source);
             var file = new FileInfo(source);
-            var stem = Path.GetFileNameWithoutExtension(file.Name);
-            var ext = file.Extension; // includes dot
+            // Folders: the whole name is the "stem" (a dot in a folder name is not an extension).
+            var stem = isDirectory ? file.Name : Path.GetFileNameWithoutExtension(file.Name);
+            var ext = isDirectory ? "" : file.Extension; // includes dot
 
             if (!string.IsNullOrEmpty(options.RemoveText))
                 stem = stem.Replace(options.RemoveText, "", StringComparison.OrdinalIgnoreCase);
@@ -50,7 +52,7 @@ public static class RenameEngine
                 OldName = file.Name,
                 NewName = newName,
                 NewPath = newPath,
-                HasConflict = File.Exists(newPath) && !PathHelpers.IsSamePath(source, newPath),
+                HasConflict = PathHelpers.PathExists(newPath) && !PathHelpers.IsSamePath(source, newPath),
             });
         }
         return items;
@@ -80,9 +82,10 @@ public static class RenameEngine
         {
             try
             {
-                if (!File.Exists(item.SourcePath))
+                var isDirectory = Directory.Exists(item.SourcePath);
+                if (!isDirectory && !File.Exists(item.SourcePath))
                 {
-                    result.Files.Add(FileOperationResult.Fail(item.SourcePath, "File no longer exists."));
+                    result.Files.Add(FileOperationResult.Fail(item.SourcePath, "File or folder no longer exists."));
                     continue;
                 }
                 if (string.Equals(item.SourcePath, item.NewPath, StringComparison.Ordinal))
@@ -90,7 +93,7 @@ public static class RenameEngine
                     result.Files.Add(FileOperationResult.Ok(item.SourcePath, item.NewPath));
                     continue;
                 }
-                var target = File.Exists(item.NewPath) && !PathHelpers.IsSamePathIgnoreCase(item.SourcePath, item.NewPath)
+                var target = PathHelpers.PathExists(item.NewPath) && !PathHelpers.IsSamePathIgnoreCase(item.SourcePath, item.NewPath)
                     ? PathHelpers.GetUniqueFilePath(item.NewPath)
                     : item.NewPath;
                 if (PathHelpers.IsSamePathIgnoreCase(item.SourcePath, item.NewPath))
@@ -98,12 +101,12 @@ public static class RenameEngine
                     // Case-only rename (e.g. "photo.jpg" → "Photo.jpg"): route via a temp name so the
                     // displayed case actually changes on case-insensitive filesystems (Windows/NTFS).
                     var temp = item.NewPath + ".fileorganizer-tmp";
-                    File.Move(item.SourcePath, temp);
-                    File.Move(temp, target);
+                    MoveItem(item.SourcePath, temp, isDirectory);
+                    MoveItem(temp, target, isDirectory);
                 }
                 else
                 {
-                    File.Move(item.SourcePath, target);
+                    MoveItem(item.SourcePath, target, isDirectory);
                 }
                 result.Files.Add(FileOperationResult.Ok(item.SourcePath, target));
                 logged.Add((item.SourcePath, target));
@@ -116,5 +119,13 @@ public static class RenameEngine
         if (logged.Count > 0)
             history.RecordBatch(result.BatchId, "Rename", logged);
         return result;
+    }
+
+    private static void MoveItem(string source, string target, bool isDirectory)
+    {
+        if (isDirectory)
+            Directory.Move(source, target);
+        else
+            File.Move(source, target);
     }
 }

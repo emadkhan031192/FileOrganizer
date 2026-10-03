@@ -2,13 +2,17 @@ namespace FileOrganizer.Core;
 
 public static class PathHelpers
 {
+    /// <summary>True when anything (file or folder) already occupies this path.</summary>
+    public static bool PathExists(string path) => File.Exists(path) || Directory.Exists(path);
+
     /// <summary>
     /// Returns <paramref name="desiredPath"/> if free, otherwise "name (1).ext", "name (2).ext", ...
-    /// Never overwrites an existing file. A file never conflicts with itself (same-path moves are no-ops upstream).
+    /// Works for files and folders alike. Never overwrites an existing file or folder.
+    /// An item never conflicts with itself (same-path moves are no-ops upstream).
     /// </summary>
     public static string GetUniqueFilePath(string desiredPath)
     {
-        if (!File.Exists(desiredPath))
+        if (!PathExists(desiredPath))
             return desiredPath;
 
         var dir = Path.GetDirectoryName(desiredPath) ?? "";
@@ -17,7 +21,7 @@ public static class PathHelpers
         for (var i = 1; i < 10_000; i++)
         {
             var candidate = Path.Combine(dir, $"{stem} ({i}){ext}");
-            if (!File.Exists(candidate))
+            if (!PathExists(candidate))
                 return candidate;
         }
         throw new IOException($"Could not find a free file name near '{desiredPath}'.");

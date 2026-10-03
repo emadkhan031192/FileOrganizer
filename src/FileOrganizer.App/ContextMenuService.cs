@@ -6,8 +6,9 @@ namespace FileOrganizer.App;
 
 /// <summary>
 /// Explorer integration (spec §2) using only supported Windows mechanisms — no Explorer hacks:
-///  1. Classic context menu (HKCU\Software\Classes, appears under "Show more options" on Windows 11):
-///       Right-click a file → "Move to Organizer" → [each Quick Destination] / "+ Add Destination".
+///  1. Classic context menu (HKCU\Software\Classes, appears under "Show more options" on Windows 11),
+///     registered for BOTH files (*) and folders (Directory):
+///       Right-click a file or folder → "Move to Organizer" → [each Quick Destination] / "+ Add Destination".
 ///     The verbs invoke: FileOrganizer.exe --move-to &lt;destinationId&gt; "%1"
 ///  2. Send To shortcuts (one .lnk per destination) as an always-supported fallback.
 ///  3. Right-click a folder → "Add as Organizer Destination".
@@ -16,33 +17,16 @@ namespace FileOrganizer.App;
 /// </summary>
 public static class ContextMenuService
 {
-    private const string MenuRoot = @"Software\Classes\*\shell\MoveToOrganizer";
+    private const string FileMenuRoot = @"Software\Classes\*\shell\MoveToOrganizer";
+    private const string FolderMenuRoot = @"Software\Classes\Directory\shell\MoveToOrganizer";
     private const string FolderAddKey = @"Software\Classes\Directory\shell\OrganizerAddDestination";
 
     private static string ExePath => Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "FileOrganizer.exe");
 
     public static void Install(AppConfig config)
     {
-        using var menu = Registry.CurrentUser.CreateSubKey(MenuRoot);
-        menu.SetValue("MUIVerb", "Move to Organizer");
-        menu.SetValue("SubCommands", "");
-        menu.SetValue("Icon", $"\"{ExePath}\",0");
-
-        // Clear old verbs so renamed/removed destinations disappear.
-        try { Registry.CurrentUser.DeleteSubKeyTree(MenuRoot + @"\shell", throwOnMissingSubKey: false); } catch (ArgumentException) { }
-
-        foreach (var dest in config.Destinations.OrderBy(d => d.SortOrder))
-        {
-            using var verb = Registry.CurrentUser.CreateSubKey($@"{MenuRoot}\shell\MoveTo_{dest.Id}");
-            verb.SetValue("MUIVerb", $"{dest.Icon} {dest.Name}");
-            using var cmd = verb.CreateSubKey("command");
-            cmd.SetValue("", $"\"{ExePath}\" --move-to \"{dest.Id}\" \"%1\"");
-        }
-
-        using var add = Registry.CurrentUser.CreateSubKey($@"{MenuRoot}\shell\ZZ_AddDestination");
-        add.SetValue("MUIVerb", "+ Add Destination…");
-        using (var cmd = add.CreateSubKey("command"))
-            cmd.SetValue("", $"\"{ExePath}\" --add-destination \"%1\"");
+        InstallMenuAt(FileMenuRoot, config);
+        InstallMenuAt(FolderMenuRoot, config);
 
         using var folderAdd = Registry.CurrentUser.CreateSubKey(FolderAddKey);
         folderAdd.SetValue("MUIVerb", "Add as Organizer Destination");
@@ -52,9 +36,34 @@ public static class ContextMenuService
         InstallSendToShortcuts(config);
     }
 
+    private static void InstallMenuAt(string menuRoot, AppConfig config)
+    {
+        using var menu = Registry.CurrentUser.CreateSubKey(menuRoot);
+        menu.SetValue("MUIVerb", "Move to Organizer");
+        menu.SetValue("SubCommands", "");
+        menu.SetValue("Icon", $"\"{ExePath}\",0");
+
+        // Clear old verbs so renamed/removed destinations disappear.
+        try { Registry.CurrentUser.DeleteSubKeyTree(menuRoot + @"\shell", throwOnMissingSubKey: false); } catch (ArgumentException) { }
+
+        foreach (var dest in config.Destinations.OrderBy(d => d.SortOrder))
+        {
+            using var verb = Registry.CurrentUser.CreateSubKey($@"{menuRoot}\shell\MoveTo_{dest.Id}");
+            verb.SetValue("MUIVerb", $"{dest.Icon} {dest.Name}");
+            using var cmd = verb.CreateSubKey("command");
+            cmd.SetValue("", $"\"{ExePath}\" --move-to \"{dest.Id}\" \"%1\"");
+        }
+
+        using var add = Registry.CurrentUser.CreateSubKey($@"{menuRoot}\shell\ZZ_AddDestination");
+        add.SetValue("MUIVerb", "+ Add Destination…");
+        using (var cmd = add.CreateSubKey("command"))
+            cmd.SetValue("", $"\"{ExePath}\" --add-destination \"%1\"");
+    }
+
     public static void Uninstall(AppConfig config)
     {
-        try { Registry.CurrentUser.DeleteSubKeyTree(MenuRoot, throwOnMissingSubKey: false); } catch (ArgumentException) { }
+        try { Registry.CurrentUser.DeleteSubKeyTree(FileMenuRoot, throwOnMissingSubKey: false); } catch (ArgumentException) { }
+        try { Registry.CurrentUser.DeleteSubKeyTree(FolderMenuRoot, throwOnMissingSubKey: false); } catch (ArgumentException) { }
         try { Registry.CurrentUser.DeleteSubKeyTree(FolderAddKey, throwOnMissingSubKey: false); } catch (ArgumentException) { }
         foreach (var file in Directory.EnumerateFiles(SendToFolder, "Move to *.lnk"))
             File.Delete(file);

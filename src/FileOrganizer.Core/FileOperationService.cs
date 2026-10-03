@@ -47,15 +47,16 @@ public sealed class FileOperationService
     {
         try
         {
-            if (!File.Exists(source))
-                return FileOperationResult.Fail(source, "File no longer exists.");
+            var isDirectory = Directory.Exists(source);
+            if (!isDirectory && !File.Exists(source))
+                return FileOperationResult.Fail(source, "File or folder no longer exists.");
 
-            var desired = Path.Combine(Environment.ExpandEnvironmentVariables(destinationFolder), Path.GetFileName(source));
+            var desired = Path.Combine(Environment.ExpandEnvironmentVariables(destinationFolder), Path.GetFileName(source.TrimEnd('\\', '/')));
             if (PathHelpers.IsSamePath(source, desired))
                 return FileOperationResult.Ok(source, desired); // already there — nothing to do
 
             var target = desired;
-            if (File.Exists(desired))
+            if (PathHelpers.PathExists(desired))
             {
                 switch (onConflict)
                 {
@@ -65,14 +66,14 @@ public sealed class FileOperationService
                         target = PathHelpers.GetUniqueFilePath(desired);
                         break;
                     case ConflictPolicy.Replace:
-                        break; // handled below by overwrite copy / delete-then-move
+                        break; // handled below (file: delete-then-move; folder: replace-whole-folder, UI confirms first)
                 }
             }
 
-            if (mode == TransferMode.Copy)
-            {
+            if (isDirectory)
+                TransferDirectory(source, target, mode, onConflict);
+            else if (mode == TransferMode.Copy)
                 File.Copy(source, target, overwrite: onConflict == ConflictPolicy.Replace);
-            }
             else
             {
                 try
@@ -96,6 +97,40 @@ public sealed class FileOperationService
         }
     }
 
+    /// <summary>Moves or copies a whole folder (recursively). Cross-volume moves fall back to copy + delete.</summary>
+    private static void TransferDirectory(string source, string target, TransferMode mode, ConflictPolicy onConflict)
+    {
+        if (onConflict == ConflictPolicy.Replace && Directory.Exists(target))
+            Directory.Delete(target, recursive: true);
+        else if (onConflict == ConflictPolicy.Replace && File.Exists(target))
+            File.Delete(target);
+
+        if (mode == TransferMode.Copy)
+        {
+            CopyDirectory(source, target);
+            return;
+        }
+
+        try
+        {
+            Directory.Move(source, target);
+        }
+        catch (IOException) when (!IsSameVolume(source, target))
+        {
+            CopyDirectory(source, target);
+            Directory.Delete(source, recursive: true);
+        }
+    }
+
+    private static void CopyDirectory(string source, string target)
+    {
+        Directory.CreateDirectory(target);
+        foreach (var file in Directory.EnumerateFiles(source))
+            File.Copy(file, Path.Combine(target, Path.GetFileName(file)), overwrite: true);
+        foreach (var dir in Directory.EnumerateDirectories(source))
+            CopyDirectory(dir, Path.Combine(target, Path.GetFileName(dir)));
+    }
+
     private static bool IsSameVolume(string a, string b)
     {
         var ra = Path.GetPathRoot(Path.GetFullPath(a));
@@ -103,7 +138,7 @@ public sealed class FileOperationService
         return string.Equals(ra, rb, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>Renames/moves arbitrary (source → destination) pairs, e.g. applying a confirmed organization preview.</summary>
+    /// <summary>Renames/moves arbitrary (source → destination) pairs — files or folders — e.g. applying a confirmed organization preview.</summary>
     public BatchResult ApplyPairs(
         IEnumerable<(string Source, string Destination)> pairs,
         TransferMode mode,
@@ -145,14 +180,17 @@ public sealed class FileOperationService
 
     private static FileOperationResult EnsureExactName(FileOperationResult moved, string desired, TransferMode mode)
     {
-        // TransferOne already produced desired's file name unless AutoRename kicked in;
+        // TransferOne already produced desired's name unless AutoRename kicked in;
         // if the caller asked for a different name (rename case), move within the folder.
-        if (PathHelpers.IsSamePath(moved.DestinationPath!, desired) || !File.Exists(moved.DestinationPath))
+        if (PathHelpers.IsSamePath(moved.DestinationPath!, desired) || !PathHelpers.PathExists(moved.DestinationPath!))
             return moved;
         if (mode == TransferMode.Copy)
             return moved; // copies keep the auto-renamed name; renaming a copy is the Rename engine's job
-        var final = File.Exists(desired) ? PathHelpers.GetUniqueFilePath(desired) : desired;
-        File.Move(moved.DestinationPath!, final);
+        var final = PathHelpers.PathExists(desired) ? PathHelpers.GetUniqueFilePath(desired) : desired;
+        if (Directory.Exists(moved.DestinationPath))
+            Directory.Move(moved.DestinationPath!, final);
+        else
+            File.Move(moved.DestinationPath!, final);
         return FileOperationResult.Ok(moved.SourcePath, final);
     }
 
@@ -176,22 +214,28 @@ public sealed class FileOperationService
             {
                 if (entry.Kind == nameof(TransferMode.Copy) || entry.Kind == "Copy")
                 {
-                    if (File.Exists(entry.DestinationPath))
+                    // Undoing a copy deletes the copy — file or whole folder.
+                    if (Directory.Exists(entry.DestinationPath))
+                        Directory.Delete(entry.DestinationPath, recursive: true);
+                    else if (File.Exists(entry.DestinationPath))
                         File.Delete(entry.DestinationPath);
                     result.Files.Add(FileOperationResult.Ok(entry.DestinationPath, entry.SourcePath));
                 }
                 else
                 {
-                    if (!File.Exists(entry.DestinationPath))
+                    if (!PathHelpers.PathExists(entry.DestinationPath))
                     {
-                        result.Files.Add(FileOperationResult.Fail(entry.DestinationPath, "File is no longer at the moved location."));
+                        result.Files.Add(FileOperationResult.Fail(entry.DestinationPath, "File or folder is no longer at the moved location."));
                         continue;
                     }
                     var back = entry.SourcePath;
                     Directory.CreateDirectory(Path.GetDirectoryName(back)!);
-                    if (File.Exists(back))
+                    if (PathHelpers.PathExists(back))
                         back = PathHelpers.GetUniqueFilePath(back); // never overwrite whatever is there now
-                    File.Move(entry.DestinationPath, back);
+                    if (Directory.Exists(entry.DestinationPath))
+                        Directory.Move(entry.DestinationPath, back);
+                    else
+                        File.Move(entry.DestinationPath, back);
                     result.Files.Add(FileOperationResult.Ok(entry.DestinationPath, back));
                 }
                 undoneIds.Add(entry.Id);

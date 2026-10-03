@@ -5,16 +5,23 @@
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         Topmost="True" ShowInTaskbar="False" SizeToContent="WidthAndHeight"
         MouseLeftButtonDown="Window_MouseLeftButtonDown">
-    <!-- §6 Quick Destination Bar: a compact floating bar. Select files in Explorer, then
-         click a button here (or drag files onto it) — no need to open the main window. -->
-    <Border Background="#F3F3F3" BorderBrush="#C8C8C8" BorderThickness="1" CornerRadius="8" Padding="6">
+    <!-- §6 Quick Destination Bar: a compact floating bar. Select files/folders in Explorer, then
+         click a destination here (or drag items onto it) — no need to open the main window.
+         ⚡ organizes the current Explorer folder; ✏ renames the current selection. -->
+    <Border Background="{DynamicResource CardBg}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="14" Padding="7">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="16" ShadowDepth="3" Opacity="0.22" Color="#1F2937"/>
+        </Border.Effect>
         <StackPanel Orientation="Horizontal">
-            <TextBlock Text="📂" FontSize="16" VerticalAlignment="Center" Margin="2,0,6,0">
-                <TextBlock.ToolTip>Drag to move this bar. Drop files onto a destination button.</TextBlock.ToolTip>
+            <TextBlock Text="📂" FontSize="17" VerticalAlignment="Center" Margin="3,0,7,0">
+                <TextBlock.ToolTip>File Organizer Quick Bar. Drag to move. Drop files or folders onto a destination button.</TextBlock.ToolTip>
             </TextBlock>
             <StackPanel x:Name="ButtonsPanel" Orientation="Horizontal"/>
-            <Button Content="＋" Click="Add_Click" ToolTip="Add destination" Margin="2"/>
-            <Button Content="✕" Click="Close_Click" ToolTip="Hide Quick Bar" Margin="2"/>
+            <Button x:Name="OrganizeBtn" Content="⚡" ToolTip="Organize the current Explorer folder (with preview)" Click="Organize_Click" Margin="3"/>
+            <Button x:Name="RenameBtn" Content="✏" ToolTip="Rename the selected files/folders" Click="Rename_Click" Margin="3"/>
+            <Button Content="＋" Click="Add_Click" ToolTip="Add destination" Margin="3"/>
+            <Button Content="🏠" Click="Home_Click" ToolTip="Open the main File Organizer window" Margin="3"/>
+            <Button Content="✕" Click="Close_Click" ToolTip="Hide Quick Bar" Margin="3"/>
         </StackPanel>
     </Border>
 </Window>

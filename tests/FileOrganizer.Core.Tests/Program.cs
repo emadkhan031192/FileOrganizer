@@ -63,6 +63,43 @@ try
         File.ReadAllText(Path.Combine(downloads, "poster (1).jpg")) == "image-bytes-2",
         string.Join(", ", Directory.EnumerateFiles(downloads, "poster*").Select(Path.GetFileName)));
 
+    // ---------- Folders move/copy too (not just files) ----------
+    var folderSrc = Path.Combine(downloads, "Customer CVs");
+    Write(folderSrc, "cv1.pdf", "cv-one");
+    Write(Path.Combine(folderSrc, "old"), "cv2.pdf", "cv-two");
+    var folderMoved = ops.TransferFiles(new[] { folderSrc }, jobsDest, TransferMode.Move);
+    Check("folder moves with all its contents",
+        folderMoved.Succeeded == 1 && !Directory.Exists(folderSrc) &&
+        File.Exists(Path.Combine(jobsDest, "Customer CVs", "cv1.pdf")) &&
+        File.Exists(Path.Combine(jobsDest, "Customer CVs", "old", "cv2.pdf")));
+
+    var folderSrc2 = Path.Combine(downloads, "Customer CVs");
+    Write(folderSrc2, "cv1.pdf", "cv-one-again");
+    var folderMoved2 = ops.TransferFiles(new[] { folderSrc2 }, jobsDest, TransferMode.Move);
+    Check("folder name conflict auto-renames the whole folder",
+        folderMoved2.Succeeded == 1 && Directory.Exists(Path.Combine(jobsDest, "Customer CVs (1)")) &&
+        File.ReadAllText(Path.Combine(jobsDest, "Customer CVs", "cv1.pdf")) == "cv-one",
+        folderMoved2.Files[0].DestinationPath ?? "none");
+
+    var folderCopy = ops.TransferFiles(new[] { Path.Combine(jobsDest, "Customer CVs") }, Path.Combine(root, "Backup"), TransferMode.Copy);
+    var copyTarget = Path.Combine(root, "Backup", "Customer CVs");
+    Check("folder copies recursively and source stays",
+        folderCopy.Succeeded == 1 && File.Exists(Path.Combine(copyTarget, "old", "cv2.pdf")) &&
+        Directory.Exists(Path.Combine(jobsDest, "Customer CVs")));
+
+    var undoCopy = ops.UndoLastBatch();
+    Check("undo of a folder copy deletes the copied folder",
+        undoCopy.Succeeded == 1 && !Directory.Exists(copyTarget) && Directory.Exists(Path.Combine(jobsDest, "Customer CVs")));
+
+    var folderRenamePreview = RenameEngine.BuildPreview(
+        new[] { Path.Combine(jobsDest, "Customer CVs (1)") },
+        new RenameOptions { AddDate = true, DatePosition = RenameDatePosition.End, DateFormat = "yyyy", DateSource = DateSource.Modified });
+    var folderRenamed = RenameEngine.Apply(folderRenamePreview, history);
+    Check("folders can be batch-renamed too",
+        folderRenamed.Succeeded == 1 && folderRenamePreview[0].NewName.StartsWith("Customer CVs (1)_20") &&
+        Directory.Exists(Path.Combine(jobsDest, folderRenamePreview[0].NewName)),
+        folderRenamePreview[0].NewName);
+
     // ---------- Auto Organize (§3/§10): preview then execute ----------
     var messy = Path.Combine(root, "Messy");
     Write(messy, "admission.pdf");

@@ -4,6 +4,7 @@
 $ErrorActionPreference = "SilentlyContinue"
 
 Remove-Item "HKCU:\Software\Classes\*\shell\MoveToOrganizer" -Recurse -Force
+Remove-Item "HKCU:\Software\Classes\Directory\shell\MoveToOrganizer" -Recurse -Force
 Remove-Item "HKCU:\Software\Classes\Directory\shell\OrganizerAddDestination" -Recurse -Force
 
 $sendTo = [Environment]::GetFolderPath("SendTo")

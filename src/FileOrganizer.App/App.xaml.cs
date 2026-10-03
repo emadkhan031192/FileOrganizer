@@ -21,6 +21,7 @@ public partial class App : Application
     {
         base.OnStartup(e);
         State = new AppState();
+        ApplyTheme(State.Config.Preferences);
 
         var args = e.Args;
         if (args.Length > 0 && HandleCommandLine(args))
@@ -53,7 +54,7 @@ public partial class App : Application
                         MessageBox.Show($"Destination not found: {args[1]}", "File Organizer", MessageBoxButton.OK, MessageBoxImage.Warning);
                         return true;
                     }
-                    var files = args.Skip(2).Where(File.Exists).ToList();
+                    var files = args.Skip(2).Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
                     var result = State.Ops.TransferFiles(files, dest.ExpandedPath,
                         State.Config.Preferences.DefaultTransferMode,
                         State.Config.Preferences.DefaultConflictPolicy);
@@ -97,6 +98,43 @@ public partial class App : Application
         {
             MessageBox.Show(ex.Message, "File Organizer", MessageBoxButton.OK, MessageBoxImage.Error);
             return true;
+        }
+    }
+
+    /// <summary>Applies Light/Dark theme + accent colour by swapping the DynamicResource brushes.</summary>
+    public static void ApplyTheme(Core.AppPreferences prefs)
+    {
+        void Set(string key, string hex)
+        {
+            if (System.Windows.Media.ColorConverter.ConvertFromString(hex) is System.Windows.Media.Color c)
+                Current.Resources[key] = new System.Windows.Media.SolidColorBrush(c);
+        }
+
+        if (string.Equals(prefs.Theme, "Dark", StringComparison.OrdinalIgnoreCase))
+        {
+            Set("WindowBg", "#171A21");
+            Set("CardBg", "#21252E");
+            Set("CardBorder", "#3A4152");
+            Set("TextPrimary", "#E9EDF5");
+            Set("TextSecondary", "#9AA7C2");
+            Set("InputBg", "#262B36");
+            Set("AccentSoft", "#2B3550");
+        }
+        else
+        {
+            Set("WindowBg", "#F3F5FA");
+            Set("CardBg", "#FFFFFF");
+            Set("CardBorder", "#D9E1F2");
+            Set("TextPrimary", "#17203A");
+            Set("TextSecondary", "#5A6B8C");
+            Set("InputBg", "#FFFFFF");
+            Set("AccentSoft", "#E8EEFE");
+        }
+
+        if (!string.IsNullOrWhiteSpace(prefs.AccentHex))
+        {
+            Set("Accent", prefs.AccentHex);
+            Set("AccentHover", prefs.AccentHex);
         }
     }
 

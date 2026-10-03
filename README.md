@@ -22,14 +22,14 @@ No browsing for folders, no heavy file manager, no account, no internet.
 
 | Area | What's included |
 |---|---|
-| **Quick "Move To" destinations** | Saved destination buttons (icon, colour, sub-destinations, drag-to-reorder via right-click menu). Seeded with *Afzal E Services → Jobs / Advertisements / School*, Documents, Personal. |
-| **Quick Destination Bar (§6)** | A small always-on-top floating bar. Click = move Explorer's current selection. Drag & drop files onto a button also works. |
-| **Explorer integration (§2)** | Only supported Windows mechanisms: classic context menu (HKCU, shows under *Show more options* on Windows 11), **Send To** shortcuts, and *Add as Organizer Destination* on folders. Install from Settings or `scripts/Install-ContextMenu.ps1`. |
+| **Quick "Move To" destinations** | Saved destination buttons (icon, colour, sub-destinations, drag-to-reorder via right-click menu). Moves **files and folders**. Seeded with *Afzal E Services → Jobs / Advertisements / School*, Documents, Personal. Manage them in the main window or in Settings (add / remove / rename). |
+| **Quick Destination Bar (§6)** | A small always-on-top floating bar. Click = move Explorer's current selection (files or folders). Drag & drop onto a button also works. Ships with a single **⚡ Organize** button (organizes the folder open in Explorer, with preview), an **✏ Rename** button, and a 🏠 button for the main window. Settings customizes the bar: show/hide ⚡/✏, icons-only vs icons+names, button size S/M/L, accent colour, Light/Dark theme. |
+| **Explorer integration (§2)** | Only supported Windows mechanisms: classic context menu for **files and folders** (HKCU, shows under *Show more options* on Windows 11), **Send To** shortcuts, and *Add as Organizer Destination* on folders. Install from Settings or `scripts/Install-ContextMenu.ps1`. |
 | **⚡ Auto Organize (§3)** | Scans a folder and files everything by extension: `PDF → Documents\PDF`, `JPG/PNG → Images`, `MP4 → Videos`, `ZIP → Archives`, … The map is fully editable in the config. Move or Copy. |
 | **Custom rules (§4)** | `IF filename contains "CV" THEN Jobs\CV`, extension + name + size + date conditions, AND/OR logic, priorities. Rules run before the extension map. |
 | **Smart date organization (§5)** | `Jobs\2026\October\…` by created / modified / filename date, optionally with the category folder appended. |
 | **Preview before organizing (§10)** | Every bulk run shows a checkable preview (file → destination + *why*). Nothing moves until you click **Organize**. |
-| **Batch rename (§7)** | Add date (`Poster_2026-10-03.jpg`, 4 date formats, beginning/end), numbering (`Photo_001`), Title Case / UPPER / lower / Capitalize, replace / remove / prefix / suffix. Case-only renames work correctly on Windows. |
+| **Batch rename (§7)** | For files and folders: Add date (`Poster_2026-10-03.jpg`, 4 date formats, beginning/end), numbering (`Photo_001`), Title Case / UPPER / lower / Capitalize, replace / remove / prefix / suffix. Case-only renames work correctly on Windows. Also on the Quick Bar (✏). |
 | **Duplicate finder (§8)** | Exact duplicates by size + SHA-256. Keep First / Newest / Oldest, then move the rest to a folder or delete them — deletion always asks first. |
 | **Fast search (§9)** | By name, extension, size and date, across the selected folder tree. |
 | **Undo (§11)** | Every move / copy / rename is logged (`history.json`). **↶ Undo Last Action** reverses the last batch; copies are undone by deleting the copy. |

@@ -144,9 +144,9 @@ public partial class MainWindow : Window
     private async void DestinationButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: Destination dest }) return;
-        var files = ExplorerSelection.GetSelectedFiles();
+        var files = ExplorerSelection.GetSelectedFiles(); // files AND folders
         if (files.Count == 0)
-            files = Dialogs.PickFiles($"No file is selected in Explorer. Pick file(s) to move to {dest.Name}:");
+            files = Dialogs.PickFiles($"No file/folder is selected in Explorer. Pick file(s) to move to {dest.Name}:");
         if (files.Count == 0) { SetStatus("No files selected — nothing moved."); return; }
         await TransferAsync(files, dest);
     }
@@ -155,7 +155,7 @@ public partial class MainWindow : Window
     {
         if (sender is not Button { Tag: Destination dest }) return;
         if (e.Data.GetData(DataFormats.FileDrop) is string[] files && files.Length > 0)
-            await TransferAsync(files.Where(File.Exists).ToList(), dest);
+            await TransferAsync(files.Where(p => File.Exists(p) || Directory.Exists(p)).ToList(), dest);
     }
 
     private async Task TransferAsync(List<string> files, Destination dest)
