@@ -11,8 +11,13 @@ namespace FileOrganizer.Core;
 public sealed class OrganizeEngine
 {
     private readonly AppConfig _config;
+    private readonly List<ExtensionMapping> _mapOverride;
 
-    public OrganizeEngine(AppConfig config) => _config = config;
+    public OrganizeEngine(AppConfig config, IEnumerable<ExtensionMapping>? mapOverride = null)
+    {
+        _config = config;
+        _mapOverride = mapOverride?.ToList() ?? config.ExtensionMap;
+    }
 
     public List<PreviewItem> BuildPreview(
         string rootFolder,
@@ -23,7 +28,7 @@ public sealed class OrganizeEngine
         if (!Directory.Exists(root))
             throw new DirectoryNotFoundException($"Folder not found: {root}");
 
-        var map = _config.ExtensionMap
+        var map = _mapOverride
             .GroupBy(m => m.Extension.TrimStart('.'), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First().RelativeFolder, StringComparer.OrdinalIgnoreCase);
         var rules = _config.Rules.Where(r => r.Enabled).OrderBy(r => r.Priority).ToList();

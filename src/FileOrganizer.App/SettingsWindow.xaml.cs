@@ -27,6 +27,7 @@ public partial class SettingsWindow : Window
         SelectTag(ThemeCombo, p.Theme);
         SelectTag(DockCombo, p.QuickBarDockMode);
         EnableHotkeysCheck.IsChecked = p.EnableHotkeys;
+        SelectTag(ProfileCombo, p.OrganizeProfile);
         AccentBox.Text = p.AccentHex;
 
         ConfigPathText.Text = State.ConfigService.ConfigPath;
@@ -126,6 +127,7 @@ public partial class SettingsWindow : Window
         p.Theme = TagOf(ThemeCombo, "Light");
         p.QuickBarDockMode = TagOf(DockCombo, "Free");
         p.EnableHotkeys = EnableHotkeysCheck.IsChecked == true;
+        p.OrganizeProfile = TagOf(ProfileCombo, "SortedDocuments");
         p.AccentHex = string.IsNullOrWhiteSpace(AccentBox.Text) ? "#2563EB" : AccentBox.Text.Trim();
 
         State.Save();

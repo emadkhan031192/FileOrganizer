@@ -52,7 +52,12 @@ public static class ExplorerSelection
         return result;
     }
 
-    /// <summary>The folder shown in the foreground/most recent Explorer window (for the Quick Bar ⚡ Organize button), or null.</summary>
+    /// <summary>
+    /// The folder of the Explorer window the user is actually looking at.
+    /// Matches the foreground window handle first (Shell windows expose HWND),
+    /// then falls back to the most recently opened Explorer window. Returns null when
+    /// no Explorer folder window exists — callers then offer a folder picker instead of failing.
+    /// </summary>
     public static string? GetExplorerFolderPath()
     {
         object? shell = null;
@@ -63,6 +68,9 @@ public static class ExplorerSelection
             shell = Activator.CreateInstance(shellType);
             if (shell is null) return null;
 
+            var foreground = GetForegroundWindow();
+            string? fallback = null;
+
             dynamic windows = ((dynamic)shell).Windows();
             for (var i = (int)windows.Count - 1; i >= 0; i--) // most recently opened window first
             {
@@ -70,12 +78,21 @@ public static class ExplorerSelection
                 {
                     dynamic window = windows.Item(i);
                     string path = window.Document.Folder.Self.Path;
-                    if (!string.IsNullOrWhiteSpace(path) && Directory.Exists(path))
-                        return path;
+                    if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
+                        continue;
+                    fallback ??= path;
+                    try
+                    {
+                        var hwnd = new IntPtr((int)window.HWND);
+                        if (foreground != IntPtr.Zero && hwnd == foreground)
+                            return path; // the Explorer window in front wins over any other
+                    }
+                    catch (Exception) { /* HWND not available on this window; fallback still applies */ }
                 }
                 catch (COMException) { /* not a folder view */ }
                 catch (Exception) { /* keep looking */ }
             }
+            return fallback;
         }
         catch (Exception) { /* Shell automation unavailable */ }
         finally
@@ -85,4 +102,7 @@ public static class ExplorerSelection
         }
         return null;
     }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
 }

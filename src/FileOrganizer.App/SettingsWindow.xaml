@@ -32,6 +32,13 @@
                     </ComboBox>
                 </StackPanel>
                 <CheckBox x:Name="EnableHotkeysCheck" Content="Enable Alt+1 … Alt+9 shortcuts (move Explorer selection to destination 1–9)" Margin="0,6,0,0"/>
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <TextBlock Text="Organize profile:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ComboBox x:Name="ProfileCombo" Width="250" SelectedIndex="0">
+                        <ComboBoxItem Tag="SortedDocuments">Sorted Documents (your doc types)</ComboBoxItem>
+                        <ComboBoxItem Tag="Standard">Standard (Images / Documents / Videos…)</ComboBoxItem>
+                    </ComboBox>
+                </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
                     <TextBlock Text="Button size:" VerticalAlignment="Center" Margin="0,0,6,0"/>
                     <ComboBox x:Name="BarSizeCombo" Width="90" SelectedIndex="1">

@@ -62,6 +62,15 @@
                 <TextBox x:Name="NumberPaddingBox" Width="34" Text="3"/>
                 <Button Content="Preview" Click="Preview_Click" Margin="14,0,0,0"/>
             </WrapPanel>
+            <WrapPanel Margin="0,4,0,0">
+                <TextBlock Text="Rename Presets:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <ComboBox x:Name="PresetCombo" Width="190" Margin="0,0,6,0">
+                    <ComboBox.ToolTip>Presets: Capitalize Words, Make Web-safe, Number Files, Time-Stamp Names, Underscores to Spaces, Unique Number</ComboBox.ToolTip>
+                </ComboBox>
+                <Button Content="Apply Preset" Click="ApplyPreset_Click"/>
+                <Button Content="Save Current as Preset…" Click="SavePreset_Click"/>
+                <Button Content="✎ Simple Rename" Click="SimpleRename_Click" ToolTip="Rename one item by just typing its new name"/>
+            </WrapPanel>
         </StackPanel>
 
         <DataGrid Grid.Row="1" x:Name="Grid" AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False" Margin="0,8,0,0">

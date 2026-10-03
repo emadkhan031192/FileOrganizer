@@ -346,7 +346,7 @@ public partial class MainWindow : Window
         List<PreviewItem> preview;
         try
         {
-            var engine = new OrganizeEngine(State.Config);
+            var engine = QuickBarWindow.CreateEngine();
             var dateOptions = byDate
                 ? new DateOrganizeOptions { Enabled = true, Source = State.Config.Preferences.OrganizeDateSource, AppendCategoryFolder = true }
                 : new DateOrganizeOptions();

@@ -19,8 +19,9 @@
             <StackPanel x:Name="ButtonsPanel" Orientation="Horizontal"/>
             <Button x:Name="OrganizeBtn" Content="⚡" ToolTip="Organize the current Explorer folder (with preview)" Click="Organize_Click" Margin="3"/>
             <Button x:Name="RenameBtn" Content="✏" ToolTip="Rename the selected files/folders" Click="Rename_Click" Margin="3"/>
+            <Button x:Name="MenuBtn" Content="☰" ToolTip="Options: open File Organizer, settings, organize, rename" Click="Menu_Click" Margin="3"/>
             <Button Content="＋" Click="Add_Click" ToolTip="Add destination" Margin="3"/>
-            <Button Content="🏠" Click="Home_Click" ToolTip="Open the main File Organizer window" Margin="3"/>
+            <Button Content="🏠" Click="Home_Click" ToolTip="Open File Organizer (main window)" Margin="3"/>
             <Button Content="✕" Click="Close_Click" ToolTip="Hide Quick Bar" Margin="3"/>
         </StackPanel>
     </Border>

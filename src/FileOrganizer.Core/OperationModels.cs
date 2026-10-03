@@ -112,6 +112,9 @@ public sealed class RenameOptions
     public int NumberStart { get; set; } = 1;
     public int NumberPadding { get; set; } = 3;
     public string NumberSeparator { get; set; } = "_";
+
+    /// <summary>"Make Web-safe": lowercase, spaces/underscores → hyphens, strip characters that aren't a-z 0-9 or hyphen, collapse repeat hyphens.</summary>
+    public bool MakeWebSafe { get; set; }
 }
 
 public sealed class RenamePreset

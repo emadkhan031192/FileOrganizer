@@ -24,6 +24,9 @@ public static class RenameEngine
 
             stem = ApplyCase(stem, options.Case);
 
+            if (options.MakeWebSafe)
+                stem = ToWebSafe(stem);
+
             if (!string.IsNullOrEmpty(options.Prefix))
                 stem = options.Prefix + stem;
             if (!string.IsNullOrEmpty(options.Suffix))
@@ -72,6 +75,16 @@ public static class RenameEngine
         CaseMode.CapitalizeFirstWord => stem.Length == 0 ? stem : char.ToUpperInvariant(stem[0]) + stem[1..],
         _ => stem,
     };
+
+    private static string ToWebSafe(string stem)
+    {
+        var lowered = stem.ToLowerInvariant().Replace(' ', '-').Replace('_', '-');
+        var chars = lowered.Where(c => (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-').ToArray();
+        var collapsed = new string(chars);
+        while (collapsed.Contains("--"))
+            collapsed = collapsed.Replace("--", "-");
+        return collapsed.Trim('-');
+    }
 
     /// <summary>Applies a confirmed rename preview. Collisions get " (1)" suffixes; every rename is logged for Undo.</summary>
     public static BatchResult Apply(IReadOnlyList<RenamePreviewItem> preview, HistoryService history)

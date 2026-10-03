@@ -164,6 +164,9 @@ public sealed class AppPreferences
     /// <summary>Accent colour as #RRGGBB used for primary buttons and highlights.</summary>
     public string AccentHex { get; set; } = "#2563EB";
 
+    /// <summary>Quick Bar / Main organize profile: "SortedDocuments" (your doc-type tree) or "Standard".</summary>
+    public string OrganizeProfile { get; set; } = "SortedDocuments";
+
     // ----- Docking / shortcuts -----
 
     /// <summary>Quick Bar placement: "Free" (floating), "ExplorerTop" (inside Explorer, ribbon area), "ExplorerBottom" (inside Explorer, bottom).</summary>
@@ -213,7 +216,46 @@ public sealed class AppConfig
             Conditions = { new RuleCondition { Field = RuleField.FileName, Operator = RuleOperator.Contains, Value = "CV" } },
             TargetRelativeFolder = @"Jobs\CV",
         });
+
+        cfg.RenamePresets.AddRange(new[]
+        {
+            new RenamePreset { Name = "Capitalize Words", Options = new RenameOptions { Case = CaseMode.TitleCase } },
+            new RenamePreset { Name = "Make Web-safe", Options = new RenameOptions { MakeWebSafe = true } },
+            new RenamePreset { Name = "Number Files", Options = new RenameOptions { AddNumbering = true, NumberStart = 1, NumberPadding = 3, NumberSeparator = "_" } },
+            new RenamePreset { Name = "Time-Stamp Names", Options = new RenameOptions { AddDate = true, DatePosition = RenameDatePosition.Beginning, DateFormat = "yyyy-MM-dd", AddTime = true, DateSource = DateSource.Modified } },
+            new RenamePreset { Name = "Underscores to Spaces", Options = new RenameOptions { ReplaceFrom = "_", ReplaceTo = " " } },
+            new RenamePreset { Name = "Unique Number", Options = new RenameOptions { AddNumbering = true, NumberStart = 1, NumberPadding = 4, NumberSeparator = "-" } },
+        });
         return cfg;
+    }
+
+    /// <summary>
+    /// "Sorted Documents" profile: document files go into a `Sorted Documents` tree using the
+    /// folder names from the user's own sorted library (Sorted Pdfs, Sorted Word Files, PSDs, …).
+    /// Non-document files keep the standard top-level categories.
+    /// </summary>
+    public static IEnumerable<ExtensionMapping> SortedDocumentsMap()
+    {
+        // Overrides first: OrganizeEngine keeps the first mapping per extension.
+        (string Folder, string[] Exts)[] groups =
+        {
+            (@"Sorted Documents\Sorted Pdfs", new[] { "pdf" }),
+            (@"Sorted Documents\Sorted Word Files", new[] { "doc", "docx", "odt" }),
+            (@"Sorted Documents\Sorted Excel Files", new[] { "xls", "xlsx", "xlsm", "csv" }),
+            (@"Sorted Documents\Sorted Powerpoint files", new[] { "ppt", "pptx", "pps", "ppsx", "odp" }),
+            (@"Sorted Documents\Sorted Text", new[] { "txt", "md", "log", "rtf" }),
+            (@"Sorted Documents\PSDs", new[] { "psd", "psb" }),
+            (@"Sorted Documents\Illustrator Files", new[] { "ai", "eps" }),
+            (@"Sorted Documents\Html Files", new[] { "html", "htm", "xhtml" }),
+            (@"Sorted Documents\Affinity designer", new[] { "afphoto", "afdesign", "afpub", "af" }),
+        };
+        foreach (var (folder, exts) in groups)
+            foreach (var ext in exts)
+                yield return new ExtensionMapping { Extension = ext, RelativeFolder = folder };
+
+        // Everything else keeps the standard categories (Images, Videos, Audio, Archives, …).
+        foreach (var m in DefaultExtensionMap().Select(t => new ExtensionMapping { Extension = t.Ext, RelativeFolder = t.Folder }))
+            yield return m;
     }
 
     /// <summary>The default ⚡ ORGANIZE categories from the spec (§3).</summary>

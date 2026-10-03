@@ -253,21 +253,17 @@ public partial class QuickBarWindow : Window
             main.RefreshActivity();
     }
 
-    /// <summary>⚡ Organize: organizes the folder currently open in Explorer, with the §10 preview first.</summary>
+    /// <summary>⚡ Organize: organizes the folder open in Explorer (foreground window), with the §10 preview first. No Explorer folder → small folder picker (never forces the main window open).</summary>
     private async void Organize_Click(object sender, RoutedEventArgs e)
     {
-        var folder = ExplorerSelection.GetExplorerFolderPath();
-        if (folder is null)
-        {
-            Dialogs.Info("Open a folder in Explorer first, then click ⚡ to organize it.");
-            return;
-        }
+        var folder = ExplorerSelection.GetExplorerFolderPath()
+                     ?? Dialogs.PickFolder("Pick the folder to organize");
+        if (folder is null) return;
 
         List<PreviewItem> preview;
         try
         {
-            var engine = new OrganizeEngine(State.Config);
-            preview = await Task.Run(() => engine.BuildPreview(folder, State.Config.Preferences.IncludeSubfolders));
+            preview = await Task.Run(() => CreateEngine().BuildPreview(folder, State.Config.Preferences.IncludeSubfolders));
         }
         catch (Exception ex)
         {
@@ -298,6 +294,12 @@ public partial class QuickBarWindow : Window
         if (Application.Current.MainWindow is MainWindow main)
             main.RefreshActivity();
     }
+
+    /// <summary>Organize engine honouring the chosen profile (Sorted Documents tree vs Standard categories).</summary>
+    internal static OrganizeEngine CreateEngine() =>
+        App.State.Config.Preferences.OrganizeProfile == "SortedDocuments"
+            ? new OrganizeEngine(App.State.Config, AppConfig.SortedDocumentsMap())
+            : new OrganizeEngine(App.State.Config);
 
     /// <summary>✏ Rename: opens batch rename for Explorer's current selection (files and folders).</summary>
     private void Rename_Click(object sender, RoutedEventArgs e)
@@ -333,6 +335,38 @@ public partial class QuickBarWindow : Window
             main.Show();
             main.Activate();
         }
+    }
+
+    /// <summary>☰ Options on the bar: opening the software/settings from here (user request).</summary>
+    private void Menu_Click(object sender, RoutedEventArgs e)
+    {
+        var menu = new ContextMenu();
+
+        MenuItem Item(string header, Action action)
+        {
+            var item = new MenuItem { Header = header };
+            item.Click += (_, _) => action();
+            menu.Items.Add(item);
+            return item;
+        }
+
+        Item("🏠 Open File Organizer", () => Home_Click(sender, e));
+        Item("⚙ Open Settings…", () =>
+        {
+            Home_Click(sender, e);
+            new SettingsWindow { Owner = this }.ShowDialog();
+            ApplyBarPreferences();
+            RefreshButtons();
+            if (Application.Current.MainWindow is MainWindow main)
+                main.RefreshDestinations();
+        });
+        Item("⚡ Organize Current Folder…", () => Organize_Click(sender, e));
+        Item("✏ Rename Selection…", () => Rename_Click(sender, e));
+        menu.Items.Add(new Separator());
+        Item("Hide Quick Bar", () => Hide());
+
+        menu.PlacementTarget = MenuBtn;
+        menu.IsOpen = true;
     }
 
     private void Close_Click(object sender, RoutedEventArgs e) => Hide();

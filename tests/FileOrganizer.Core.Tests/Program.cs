@@ -158,6 +158,32 @@ try
         File.Exists(Path.Combine(messy, "Jobs", "CV", "My CV 2026.docx")),
         string.Join(", ", Directory.EnumerateFiles(messy, "*", SearchOption.AllDirectories).Select(p => Path.GetRelativePath(messy, p))));
 
+    // ---------- Sorted Documents profile ----------
+    var docDir = Path.Combine(root, "MixedDocs");
+    Write(docDir, "paper.pdf");
+    Write(docDir, "design.ai");
+    Write(docDir, "layout.psd");
+    Write(docDir, "page.html");
+    Write(docDir, "cover.afdesign");
+    Write(docDir, "sheet.xlsx");
+    var sortedEngine = new OrganizeEngine(config, AppConfig.SortedDocumentsMap());
+    var sortedPreview = sortedEngine.BuildPreview(docDir);
+    Check("Sorted Documents: PDF → Sorted Documents\\Sorted Pdfs",
+        sortedPreview.Any(p => p.FileName == "paper.pdf" && p.DestinationFolder.EndsWith(Path.Combine("Sorted Documents", "Sorted Pdfs"))),
+        sortedPreview.FirstOrDefault(p => p.FileName == "paper.pdf")?.DestinationFolder ?? "missing");
+    Check("Sorted Documents: AI/PSD/HTML/Affinity folders",
+        sortedPreview.Any(p => p.FileName == "design.ai" && p.DestinationFolder.EndsWith("Illustrator Files")) &&
+        sortedPreview.Any(p => p.FileName == "layout.psd" && p.DestinationFolder.EndsWith("PSDs")) &&
+        sortedPreview.Any(p => p.FileName == "page.html" && p.DestinationFolder.EndsWith("Html Files")) &&
+        sortedPreview.Any(p => p.FileName == "cover.afdesign" && p.DestinationFolder.EndsWith("Affinity designer")) &&
+        sortedPreview.Any(p => p.FileName == "sheet.xlsx" && p.DestinationFolder.EndsWith("Sorted Excel Files")));
+
+    // ---------- Make Web-safe rename ----------
+    var webSafe = RenameEngine.BuildPreview(new[] { Write(downloads, "My Cool File_Name!.jpg") },
+        new RenameOptions { MakeWebSafe = true });
+    Check("Make Web-safe: lowercase hyphens, no unsafe chars",
+        webSafe[0].NewName == "my-cool-file-name.jpg", webSafe[0].NewName);
+
     // ---------- Custom rules AND/OR (§4) ----------
     var andRule = new OrganizeRule
     {
