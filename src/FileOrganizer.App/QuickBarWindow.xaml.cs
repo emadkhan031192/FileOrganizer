@@ -1,7 +1,10 @@
 using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using FileOrganizer.Core;
 
 namespace FileOrganizer.App;
@@ -11,6 +14,7 @@ public partial class QuickBarWindow : Window
     private static QuickBarWindow? _instance;
 
     private AppState State => App.State;
+    private readonly DispatcherTimer _dockTimer;
 
     private QuickBarWindow()
     {
@@ -20,9 +24,79 @@ public partial class QuickBarWindow : Window
         // Bottom-centre by default, just above the taskbar — close to Explorer without covering it.
         Loaded += (_, _) =>
         {
-            Left = (SystemParameters.WorkArea.Width - ActualWidth) / 2;
-            Top = SystemParameters.WorkArea.Bottom - ActualHeight - 12;
+            if (State.Config.Preferences.QuickBarDockMode == "Free")
+            {
+                Left = (SystemParameters.WorkArea.Width - ActualWidth) / 2;
+                Top = SystemParameters.WorkArea.Bottom - ActualHeight - 12;
+            }
         };
+
+        // Dock mode: follow the foreground Explorer window (see FollowExplorer).
+        _dockTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(350) };
+        _dockTimer.Tick += (_, _) => FollowExplorer();
+        _dockTimer.Start();
+        Closed += (_, _) => _dockTimer.Stop();
+    }
+
+    /// <summary>
+    /// Docking (feature 1): in ExplorerTop/ExplorerBottom mode the bar sticks inside the
+    /// foreground Explorer window — top mode sits in the ribbon area Explorer leaves empty,
+    /// bottom mode sits just above Explorer's status bar. Free mode never moves the bar.
+    /// The bar never takes activation on its own, so Explorer keeps the focus/selection.
+    /// </summary>
+    private void FollowExplorer()
+    {
+        var mode = State.Config.Preferences.QuickBarDockMode;
+        if (mode == "Free" || !IsVisible)
+            return;
+
+        var hwnd = GetForegroundWindow();
+        if (hwnd == IntPtr.Zero)
+            return;
+        var className = new StringBuilder(256);
+        if (GetClassName(hwnd, className, className.Capacity) == 0)
+            return;
+        var cls = className.ToString();
+        if (cls is not ("CabinetWClass" or "ExplorerWClass")) // Explorer folder windows only
+            return;
+        if (!GetWindowRect(hwnd, out var rect))
+            return;
+
+        var width = ActualWidth;
+        var height = ActualHeight;
+        if (width <= 0 || height <= 0)
+            return;
+
+        double targetLeft, targetTop;
+        if (mode == "ExplorerTop")
+        {
+            // Ribbon area: right-aligned under the title bar, where Explorer's ribbon is usually empty.
+            targetLeft = rect.Right - width - 18;
+            targetTop = rect.Top + 54;
+        }
+        else // ExplorerBottom
+        {
+            targetLeft = rect.Left + (rect.Right - rect.Left - width) / 2;
+            targetTop = rect.Bottom - height - 34;
+        }
+
+        if (Math.Abs(Left - targetLeft) > 2) Left = targetLeft;
+        if (Math.Abs(Top - targetTop) > 2) Top = targetTop;
+    }
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr hWnd, out Rect rect);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Rect
+    {
+        public int Left, Top, Right, Bottom;
     }
 
     /// <summary>Shows the single floating Quick Bar, creating it on first use.</summary>
@@ -72,9 +146,12 @@ public partial class QuickBarWindow : Window
         };
 
         ButtonsPanel.Children.Clear();
-        foreach (var dest in State.Config.Destinations.OrderBy(d => d.SortOrder))
+        var destinations = State.Config.Destinations.OrderBy(d => d.SortOrder).ToList();
+        for (var i = 0; i < destinations.Count; i++)
         {
+            var dest = destinations[i];
             var isChild = dest.ParentId is not null;
+            var shortcut = i < 9 ? $" (Alt+{i + 1})" : "";
             var button = new Button
             {
                 Style = (Style)FindResource("DestinationButton"),
@@ -84,7 +161,7 @@ public partial class QuickBarWindow : Window
                 Margin = new Thickness(3),
                 Padding = pad,
                 FontSize = font,
-                ToolTip = $"Move selected file(s)/folder(s) to {dest.ExpandedPath}",
+                ToolTip = $"Move selected file(s)/folder(s) to {dest.ExpandedPath}{shortcut}",
             };
             button.Click += Destination_Click;
             button.DragOver += (s, e) => { if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effects = DragDropEffects.Move; };
@@ -139,8 +216,12 @@ public partial class QuickBarWindow : Window
         if (sender is not Button { Tag: Destination dest }) return;
         var items = ExplorerSelection.GetSelectedFiles(); // files AND folders
         if (items.Count == 0) return; // nothing selected in Explorer — ignore instead of popping a picker over Explorer
-        var result = await Task.Run(() => State.Ops.TransferFiles(items, dest.ExpandedPath,
-            State.Config.Preferences.DefaultTransferMode, State.Config.Preferences.DefaultConflictPolicy));
+        var mode = State.Config.Preferences.DefaultTransferMode;
+        var conflict = State.Config.Preferences.DefaultConflictPolicy;
+        if (!await TransferHelper.ConfirmIfNeededAsync(this, items, dest.Name, mode)) return;
+        var result = items.Count >= 10 || items.Any(Directory.Exists)
+            ? await TransferHelper.RunTransferWithProgressAsync(this, items, dest, mode, conflict)
+            : await Task.Run(() => State.Ops.TransferFiles(items, dest.ExpandedPath, mode, conflict));
         ShowResult($"→ {dest.Name}", result);
     }
 
@@ -151,17 +232,23 @@ public partial class QuickBarWindow : Window
         {
             var items = dropped.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
             if (items.Count == 0) return;
-            var result = await Task.Run(() => State.Ops.TransferFiles(items, dest.ExpandedPath,
-                State.Config.Preferences.DefaultTransferMode, State.Config.Preferences.DefaultConflictPolicy));
+            var mode = State.Config.Preferences.DefaultTransferMode;
+            var conflict = State.Config.Preferences.DefaultConflictPolicy;
+            if (!await TransferHelper.ConfirmIfNeededAsync(this, items, dest.Name, mode)) return;
+            var result = items.Count >= 10 || items.Any(Directory.Exists)
+                ? await TransferHelper.RunTransferWithProgressAsync(this, items, dest, mode, conflict)
+                : await Task.Run(() => State.Ops.TransferFiles(items, dest.ExpandedPath, mode, conflict));
             ShowResult($"→ {dest.Name}", result);
         }
     }
 
     private void ShowResult(string label, BatchResult result)
     {
-        ToolTip = result.Failed > 0
-            ? $"⚠ {result.Succeeded} moved {label} · {result.Failed} failed · {result.SkippedCount} skipped"
-            : $"✓ {result.Succeeded} item(s) {label}" + (result.SkippedCount > 0 ? $" · {result.SkippedCount} skipped (already existed)" : "");
+        ToolTip = result.Cancelled
+            ? $"⏹ Cancelled — {result.Succeeded} item(s) moved {label} (Undo in main window reverses them)"
+            : result.Failed > 0
+                ? $"⚠ {result.Succeeded} moved {label} · {result.Failed} failed · {result.SkippedCount} skipped"
+                : $"✓ {result.Succeeded} item(s) {label}" + (result.SkippedCount > 0 ? $" · {result.SkippedCount} skipped (already existed)" : "");
         if (Application.Current.MainWindow is MainWindow main)
             main.RefreshActivity();
     }
@@ -199,13 +286,15 @@ public partial class QuickBarWindow : Window
         var confirmed = window.ConfirmedItems;
         if (confirmed.Count == 0) return;
 
-        var result = await Task.Run(() => State.Ops.ApplyPairs(
-            confirmed.Select(p => (p.SourcePath, p.DestinationPath)),
+        var pairs = confirmed.Select(p => (p.SourcePath, p.DestinationPath)).ToList();
+        var result = await TransferHelper.RunApplyWithProgressAsync(this, pairs,
             State.Config.Preferences.DefaultTransferMode,
-            State.Config.Preferences.DefaultConflictPolicy));
-        Dialogs.Info($"Organized {result.Succeeded} file(s) in {folder}." +
-                     (result.Failed > 0 ? $"\nFailed: {result.Failed}" : "") +
-                     "\n(↶ Undo in the main window reverses this.)");
+            State.Config.Preferences.DefaultConflictPolicy);
+        Dialogs.Info(result.Cancelled
+            ? $"Cancelled — {result.Succeeded} file(s) were already organized in {folder}.\n(↶ Undo in the main window reverses them.)"
+            : $"Organized {result.Succeeded} file(s) in {folder}." +
+              (result.Failed > 0 ? $"\nFailed: {result.Failed}" : "") +
+              "\n(↶ Undo in the main window reverses this.)");
         if (Application.Current.MainWindow is MainWindow main)
             main.RefreshActivity();
     }

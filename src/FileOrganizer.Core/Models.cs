@@ -163,6 +163,14 @@ public sealed class AppPreferences
 
     /// <summary>Accent colour as #RRGGBB used for primary buttons and highlights.</summary>
     public string AccentHex { get; set; } = "#2563EB";
+
+    // ----- Docking / shortcuts -----
+
+    /// <summary>Quick Bar placement: "Free" (floating), "ExplorerTop" (inside Explorer, ribbon area), "ExplorerBottom" (inside Explorer, bottom).</summary>
+    public string QuickBarDockMode { get; set; } = "Free";
+
+    /// <summary>Global shortcuts: Explorer selection + Alt+1..Alt+9 moves to destination 1..9. App must be running.</summary>
+    public bool EnableHotkeys { get; set; } = true;
 }
 
 /// <summary>Everything File Organizer persists locally (destinations, rules, categories, presets, recent folders).</summary>

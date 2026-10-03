@@ -26,17 +26,24 @@ public sealed class FileOperationService
         Directory.CreateDirectory(Environment.ExpandEnvironmentVariables(destinationFolder));
 
         var logged = new List<(string, string)>();
-        for (var i = 0; i < sources.Count; i++)
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var source = sources[i];
-            progress?.Report((i, sources.Count, Path.GetFileName(source)));
-            var r = TransferOne(source, destinationFolder, mode, onConflict);
-            result.Files.Add(r);
-            if (r.Success && r.DestinationPath is not null)
-                logged.Add((source, r.DestinationPath));
+            for (var i = 0; i < sources.Count; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var source = sources[i];
+                progress?.Report((i, sources.Count, Path.GetFileName(source)));
+                var r = TransferOne(source, destinationFolder, mode, onConflict);
+                result.Files.Add(r);
+                if (r.Success && r.DestinationPath is not null)
+                    logged.Add((source, r.DestinationPath));
+            }
+            progress?.Report((sources.Count, sources.Count, ""));
         }
-        progress?.Report((sources.Count, sources.Count, ""));
+        catch (OperationCanceledException)
+        {
+            result.Cancelled = true; // items already moved stay moved — and are logged below for Undo
+        }
 
         if (logged.Count > 0)
             _history.RecordBatch(result.BatchId, mode.ToString(), logged);
@@ -149,30 +156,38 @@ public sealed class FileOperationService
         var list = pairs.ToList();
         var result = new BatchResult();
         var logged = new List<(string, string)>();
-        for (var i = 0; i < list.Count; i++)
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var (source, desired) = list[i];
-            progress?.Report((i, list.Count, Path.GetFileName(source)));
-            FileOperationResult r;
-            var folder = Path.GetDirectoryName(desired);
-            if (string.IsNullOrEmpty(folder))
+            for (var i = 0; i < list.Count; i++)
             {
-                r = FileOperationResult.Fail(source, "Destination has no folder.");
+                cancellationToken.ThrowIfCancellationRequested();
+                var (source, desired) = list[i];
+                progress?.Report((i, list.Count, Path.GetFileName(source)));
+                FileOperationResult r;
+                var folder = Path.GetDirectoryName(desired);
+                if (string.IsNullOrEmpty(folder))
+                {
+                    r = FileOperationResult.Fail(source, "Destination has no folder.");
+                }
+                else
+                {
+                    Directory.CreateDirectory(folder);
+                    r = TransferOne(source, folder, mode, onConflict) is var moved && moved.Success && moved.DestinationPath is not null
+                        // TransferOne targets folder+filename; honour an explicitly different destination file name:
+                        ? EnsureExactName(moved, desired, mode)
+                        : moved;
+                }
+                result.Files.Add(r);
+                if (r.Success && r.DestinationPath is not null)
+                    logged.Add((source, r.DestinationPath));
             }
-            else
-            {
-                Directory.CreateDirectory(folder);
-                r = TransferOne(source, folder, mode, onConflict) is var moved && moved.Success && moved.DestinationPath is not null
-                    // TransferOne targets folder+filename; honour an explicitly different destination file name:
-                    ? EnsureExactName(moved, desired, mode)
-                    : moved;
-            }
-            result.Files.Add(r);
-            if (r.Success && r.DestinationPath is not null)
-                logged.Add((source, r.DestinationPath));
+            progress?.Report((list.Count, list.Count, ""));
         }
-        progress?.Report((list.Count, list.Count, ""));
+        catch (OperationCanceledException)
+        {
+            result.Cancelled = true;
+        }
+
         if (logged.Count > 0)
             _history.RecordBatch(result.BatchId, mode.ToString(), logged);
         return result;

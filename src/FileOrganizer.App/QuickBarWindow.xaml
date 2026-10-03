@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="File Organizer — Quick Bar"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        Topmost="True" ShowInTaskbar="False" SizeToContent="WidthAndHeight"
+        Topmost="True" ShowInTaskbar="False" ShowActivated="False" SizeToContent="WidthAndHeight"
         MouseLeftButtonDown="Window_MouseLeftButtonDown">
     <!-- §6 Quick Destination Bar: a compact floating bar. Select files/folders in Explorer, then
          click a destination here (or drag items onto it) — no need to open the main window.

@@ -25,6 +25,8 @@ public partial class SettingsWindow : Window
         BarShowLabelsCheck.IsChecked = p.QuickBarShowLabels;
         SelectTag(BarSizeCombo, p.QuickBarSize);
         SelectTag(ThemeCombo, p.Theme);
+        SelectTag(DockCombo, p.QuickBarDockMode);
+        EnableHotkeysCheck.IsChecked = p.EnableHotkeys;
         AccentBox.Text = p.AccentHex;
 
         ConfigPathText.Text = State.ConfigService.ConfigPath;
@@ -122,12 +124,16 @@ public partial class SettingsWindow : Window
         p.QuickBarShowLabels = BarShowLabelsCheck.IsChecked == true;
         p.QuickBarSize = TagOf(BarSizeCombo, "M");
         p.Theme = TagOf(ThemeCombo, "Light");
+        p.QuickBarDockMode = TagOf(DockCombo, "Free");
+        p.EnableHotkeys = EnableHotkeysCheck.IsChecked == true;
         p.AccentHex = string.IsNullOrWhiteSpace(AccentBox.Text) ? "#2563EB" : AccentBox.Text.Trim();
 
         State.Save();
         ContextMenuService.SetRunAtStartup(p.RunAtStartup);
         App.ApplyTheme(p);
         RefreshBars();
+        if (Application.Current.MainWindow is MainWindow appMain)
+            appMain.ReregisterHotkeys();
         DialogResult = true;
         Close();
     }

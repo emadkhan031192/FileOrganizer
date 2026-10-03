@@ -100,6 +100,26 @@ try
         Directory.Exists(Path.Combine(jobsDest, folderRenamePreview[0].NewName)),
         folderRenamePreview[0].NewName);
 
+    // ---------- Cancellation keeps partial progress logged (Undo still works) ----------
+    var cancelDir = Path.Combine(root, "CancelTest");
+    var c1 = Write(cancelDir, "one.txt", "1");
+    var c2 = Write(cancelDir, "two.txt", "2");
+    var c3 = Write(cancelDir, "three.txt", "3");
+    using var cts = new CancellationTokenSource();
+    // Progress<T> posts callbacks asynchronously; use a synchronous IProgress for determinism.
+    var syncProgress = new SyncProgress(p =>
+    {
+        if (p.Done >= 1) cts.Cancel();
+    });
+    var cancelledResult = ops.TransferFiles(new[] { c1, c2, c3 }, Path.Combine(cancelDir, "out"),
+        TransferMode.Move, ConflictPolicy.AutoRename, syncProgress, cts.Token);
+    Check("cancelled batch reports Cancelled with partial success",
+        cancelledResult.Cancelled && cancelledResult.Succeeded >= 1 && cancelledResult.Succeeded < 3,
+        $"succeeded={cancelledResult.Succeeded}");
+    Check("cancelled batch leaves un-moved files in place",
+        Directory.EnumerateFiles(cancelDir, "*.txt").Count() == 3 - cancelledResult.Succeeded,
+        $"remaining={Directory.EnumerateFiles(cancelDir, "*.txt").Count()}");
+
     // ---------- Auto Organize (§3/§10): preview then execute ----------
     var messy = Path.Combine(root, "Messy");
     Write(messy, "admission.pdf");
@@ -212,3 +232,11 @@ finally
 
 Console.WriteLine(failures == 0 ? "\nALL TESTS PASSED" : $"\n{failures} TEST(S) FAILED");
 return Math.Min(failures, 125);
+
+/// <summary>Synchronous IProgress for deterministic cancellation tests (Progress&lt;T&gt; posts async).</summary>
+sealed class SyncProgress : IProgress<(int Done, int Total, string CurrentFile)>
+{
+    private readonly Action<(int Done, int Total, string CurrentFile)> _onReport;
+    public SyncProgress(Action<(int Done, int Total, string CurrentFile)> onReport) => _onReport = onReport;
+    public void Report((int Done, int Total, string CurrentFile) value) => _onReport(value);
+}

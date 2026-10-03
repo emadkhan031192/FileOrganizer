@@ -1,8 +1,10 @@
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using FileOrganizer.Core;
 
@@ -12,6 +14,19 @@ public partial class MainWindow : Window
 {
     private AppState State => App.State;
 
+    // ----- Global hotkeys (feature 2): Alt+1..Alt+9 → destinations 1..9 -----
+    private const int WmHotkey = 0x0312;
+    private const uint ModAlt = 0x0001;
+    private const int HotkeyBaseId = 9001;
+    private HwndSource? _hwndSource;
+    private readonly List<int> _registeredHotkeys = new();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint fsModifiers, uint vk);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
     public MainWindow()
     {
         InitializeComponent();
@@ -19,6 +34,90 @@ public partial class MainWindow : Window
         RefreshDestinations();
         RefreshActivity();
         RefreshRecentFolders();
+        SourceInitialized += MainWindow_SourceInitialized;
+        Closed += MainWindow_Closed;
+    }
+
+    private void MainWindow_SourceInitialized(object? sender, EventArgs e)
+    {
+        var handle = new WindowInteropHelper(this).Handle;
+        _hwndSource = HwndSource.FromHwnd(handle);
+        _hwndSource?.AddHook(WndProc);
+        RegisterDestinationHotkeys(handle);
+    }
+
+    private void RegisterDestinationHotkeys(IntPtr handle)
+    {
+        foreach (var id in _registeredHotkeys)
+            UnregisterHotKey(handle, id);
+        _registeredHotkeys.Clear();
+
+        if (!State.Config.Preferences.EnableHotkeys)
+            return;
+
+        var count = Math.Min(9, State.Config.Destinations.Count);
+        for (var i = 0; i < count; i++)
+        {
+            var id = HotkeyBaseId + i;
+            // VK_1..VK_9 = 0x31..0x39. A failed registration (shortcut taken by another app) is skipped silently.
+            if (RegisterHotKey(handle, id, ModAlt, (uint)(0x31 + i)))
+                _registeredHotkeys.Add(id);
+        }
+    }
+
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WmHotkey)
+        {
+            var index = wParam.ToInt32() - HotkeyBaseId;
+            var destinations = State.Config.Destinations.OrderBy(d => d.SortOrder).ToList();
+            if (index >= 0 && index < destinations.Count)
+            {
+                _ = HotkeyMoveAsync(destinations[index]);
+                handled = true;
+            }
+        }
+        return IntPtr.Zero;
+    }
+
+    /// <summary>Alt+N move: Explorer's current selection (files/folders) → destination N, with Quick Bar feedback.</summary>
+    private async Task HotkeyMoveAsync(Destination dest)
+    {
+        var items = ExplorerSelection.GetSelectedFiles();
+        if (items.Count == 0)
+        {
+            SetStatus($"Alt shortcut for {dest.Name}: nothing is selected in Explorer.");
+            return;
+        }
+        var mode = State.Config.Preferences.DefaultTransferMode;
+        var conflict = State.Config.Preferences.DefaultConflictPolicy;
+        if (!await TransferHelper.ConfirmIfNeededAsync(this, items, dest.Name, mode))
+            return;
+        var result = items.Count >= 10 || items.Any(Directory.Exists)
+            ? await TransferHelper.RunTransferWithProgressAsync(this, items, dest, mode, conflict)
+            : await Task.Run(() => State.Ops.TransferFiles(items, dest.ExpandedPath, mode, conflict));
+        SetStatus(result.Cancelled
+            ? $"⏹ Alt+ move cancelled — {result.Succeeded} item(s) already moved to {dest.Name}"
+            : $"✓ {result.Succeeded} item(s) → {dest.Name} (hotkey)" +
+              (result.SkippedCount > 0 ? $" · {result.SkippedCount} skipped" : "") +
+              (result.Failed > 0 ? $" · {result.Failed} failed" : ""));
+        RefreshActivity();
+    }
+
+    internal void ReregisterHotkeys()
+    {
+        var handle = new WindowInteropHelper(this).Handle;
+        if (handle != IntPtr.Zero)
+            RegisterDestinationHotkeys(handle);
+    }
+
+    private void MainWindow_Closed(object? sender, EventArgs e)
+    {
+        var handle = new WindowInteropHelper(this).Handle;
+        foreach (var id in _registeredHotkeys)
+            UnregisterHotKey(handle, id);
+        _registeredHotkeys.Clear();
+        _hwndSource?.RemoveHook(WndProc);
     }
 
     // ---------- Quick Destinations (§1/§6/§12) ----------
@@ -163,14 +262,22 @@ public partial class MainWindow : Window
         var mode = ParseEnum<TransferMode>(TransferModeCombo, TransferMode.Move);
         var conflict = ParseEnum<ConflictPolicy>(ConflictCombo, ConflictPolicy.AutoRename);
         if (conflict == ConflictPolicy.Replace &&
-            !Dialogs.Confirm($"Replace mode: existing files in \"{dest.Name}\" with the same name WILL be overwritten. Continue?"))
+            !Dialogs.Confirm($"Replace mode: existing files/folders in \"{dest.Name}\" with the same name WILL be overwritten. Continue?"))
             return;
 
-        SetStatus($"Moving {files.Count} file(s) to {dest.Name}…");
-        var result = await Task.Run(() => State.Ops.TransferFiles(files, dest.ExpandedPath, mode, conflict));
-        SetStatus($"✓ {result.Succeeded} file(s) → {dest.Name}" +
-                  (result.SkippedCount > 0 ? $" · {result.SkippedCount} skipped (already existed)" : "") +
-                  (result.Failed > 0 ? $" · {result.Failed} failed: {FirstError(result)}" : ""));
+        if (!await TransferHelper.ConfirmIfNeededAsync(this, files, dest.Name, mode))
+        {
+            SetStatus("Move cancelled before starting — nothing moved.");
+            return;
+        }
+
+        SetStatus($"Moving {files.Count} item(s) to {dest.Name}…");
+        var result = await TransferHelper.RunTransferWithProgressAsync(this, files, dest, mode, conflict);
+        SetStatus(result.Cancelled
+            ? $"⏹ Cancelled — {result.Succeeded} item(s) already moved to {dest.Name} (↶ Undo reverses them)"
+            : $"✓ {result.Succeeded} item(s) → {dest.Name}" +
+              (result.SkippedCount > 0 ? $" · {result.SkippedCount} skipped (already existed)" : "") +
+              (result.Failed > 0 ? $" · {result.Failed} failed: {FirstError(result)}" : ""));
         RefreshActivity();
     }
 
@@ -260,14 +367,14 @@ public partial class MainWindow : Window
 
         var mode = ParseEnum<TransferMode>(TransferModeCombo, TransferMode.Move);
         var conflict = ParseEnum<ConflictPolicy>(ConflictCombo, ConflictPolicy.AutoRename);
-        var progress = new Progress<(int Done, int Total, string CurrentFile)>(
-            p => SetStatus($"Organizing {p.Done}/{p.Total} — {p.CurrentFile}"));
-        var result = await Task.Run(() => State.Ops.ApplyPairs(
-            confirmed.Select(p => (p.SourcePath, p.DestinationPath)), mode, conflict, progress));
-        SetStatus($"✓ Organized {result.Succeeded} file(s)" +
-                  (result.SkippedCount > 0 ? $" · {result.SkippedCount} skipped" : "") +
-                  (result.Failed > 0 ? $" · {result.Failed} failed: {FirstError(result)}" : "") +
-                  "  (↶ Undo reverses this)");
+        var pairs = confirmed.Select(p => (p.SourcePath, p.DestinationPath)).ToList();
+        var result = await TransferHelper.RunApplyWithProgressAsync(this, pairs, mode, conflict);
+        SetStatus(result.Cancelled
+            ? $"⏹ Cancelled — {result.Succeeded} file(s) already organized (↶ Undo reverses them)"
+            : $"✓ Organized {result.Succeeded} file(s)" +
+              (result.SkippedCount > 0 ? $" · {result.SkippedCount} skipped" : "") +
+              (result.Failed > 0 ? $" · {result.Failed} failed: {FirstError(result)}" : "") +
+              "  (↶ Undo reverses this)");
         RefreshActivity();
     }
 

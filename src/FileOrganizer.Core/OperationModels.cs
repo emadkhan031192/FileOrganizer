@@ -34,6 +34,9 @@ public sealed class BatchResult
     public int Succeeded => Files.Count(f => f.Success);
     public int SkippedCount => Files.Count(f => f.Skipped);
     public int Failed => Files.Count(f => !f.Success && !f.Skipped);
+
+    /// <summary>True when the user cancelled mid-batch. Completed items are still logged, so Undo reverses exactly what was done.</summary>
+    public bool Cancelled { get; set; }
 }
 
 /// <summary>One row of the ORGANIZATION PREVIEW (§10): where a file would go, and why.</summary>

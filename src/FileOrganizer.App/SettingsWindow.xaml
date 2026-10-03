@@ -24,6 +24,15 @@
                 <CheckBox x:Name="ShowRenameOnBarCheck" Content="Show ✏ Rename button on the bar" Margin="0,4,0,0"/>
                 <CheckBox x:Name="BarShowLabelsCheck" Content="Show destination names next to icons (off = icons only)" Margin="0,4,0,0"/>
                 <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                    <TextBlock Text="Dock bar:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ComboBox x:Name="DockCombo" Width="230" SelectedIndex="0">
+                        <ComboBoxItem Tag="Free">Free floating</ComboBoxItem>
+                        <ComboBoxItem Tag="ExplorerTop">Inside Explorer — ribbon area (top)</ComboBoxItem>
+                        <ComboBoxItem Tag="ExplorerBottom">Inside Explorer — bottom</ComboBoxItem>
+                    </ComboBox>
+                </StackPanel>
+                <CheckBox x:Name="EnableHotkeysCheck" Content="Enable Alt+1 … Alt+9 shortcuts (move Explorer selection to destination 1–9)" Margin="0,6,0,0"/>
+                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
                     <TextBlock Text="Button size:" VerticalAlignment="Center" Margin="0,0,6,0"/>
                     <ComboBox x:Name="BarSizeCombo" Width="90" SelectedIndex="1">
                         <ComboBoxItem Tag="S">Small</ComboBoxItem>
