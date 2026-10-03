@@ -24,6 +24,15 @@ public partial class App : Application
         ApplyTheme(State.Config.Preferences);
 
         var args = e.Args;
+        if (args.Length >= 2 &&
+            string.Equals(args[0], "--organize", StringComparison.OrdinalIgnoreCase) &&
+            System.IO.Directory.Exists(args[1]))
+        {
+            // Interactive right-click flow: preview → progress → done, without opening the main window.
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            _ = OrganizeFromCommandLineAsync(args[1]);
+            return;
+        }
         if (args.Length > 0 && HandleCommandLine(args))
         {
             Shutdown(); // a headless command ran; do not open the GUI
@@ -37,6 +46,57 @@ public partial class App : Application
 
         if (State.Config.Preferences.ShowQuickBarOnStart)
             QuickBarWindow.ShowBar();
+    }
+
+    /// <summary>
+    /// "Organize this folder" (Explorer right-click): builds the preview with the active profile,
+    /// asks for confirmation (unless disabled in Settings), then organizes with progress + Cancel.
+    /// </summary>
+    private async Task OrganizeFromCommandLineAsync(string folder)
+    {
+        try
+        {
+            var preview = await Task.Run(() => QuickBarWindow.CreateEngine().BuildPreview(
+                folder, State.Config.Preferences.IncludeSubfolders));
+            if (preview.Count == 0)
+            {
+                MessageBox.Show($"Nothing to organize in:\n{folder}", "File Organizer",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var confirmed = preview;
+            if (State.Config.Preferences.ConfirmBeforeOrganize)
+            {
+                var window = new PreviewWindow(preview);
+                if (window.ShowDialog() != true)
+                    return;
+                confirmed = window.ConfirmedItems;
+                if (confirmed.Count == 0)
+                    return;
+            }
+
+            var host = new Window { Width = 1, Height = 1, ShowInTaskbar = false, WindowStyle = WindowStyle.None, Opacity = 0 };
+            host.Show();
+            var pairs = confirmed.Select(p => (p.SourcePath, p.DestinationPath)).ToList();
+            var result = await TransferHelper.RunApplyWithProgressAsync(host, pairs,
+                State.Config.Preferences.DefaultTransferMode,
+                State.Config.Preferences.DefaultConflictPolicy);
+            host.Close();
+            MessageBox.Show(result.Cancelled
+                    ? $"Cancelled — {result.Succeeded} file(s) were already organized in {folder}.\n(↶ Undo in File Organizer reverses them.)"
+                    : $"Organized {result.Succeeded} file(s) in {folder}." +
+                      (result.Failed > 0 ? $"\nFailed: {result.Failed}" : ""),
+                "File Organizer", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "File Organizer", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            Shutdown();
+        }
     }
 
     /// <summary>Returns true when a headless command was handled (caller should exit).</summary>
@@ -78,16 +138,6 @@ public partial class App : Application
                     });
                     State.Save();
                     MessageBox.Show($"Added destination: {args[1]}", "File Organizer");
-                    return true;
-                }
-                case "--organize" when args.Length >= 2 && Directory.Exists(args[1]):
-                {
-                    var engine = new OrganizeEngine(State.Config);
-                    var preview = engine.BuildPreview(args[1], State.Config.Preferences.IncludeSubfolders);
-                    var applied = State.Ops.ApplyPairs(
-                        preview.Select(p => (p.SourcePath, p.DestinationPath)), TransferMode.Move,
-                        State.Config.Preferences.DefaultConflictPolicy);
-                    MessageBox.Show($"Organized {applied.Succeeded} file(s) in {args[1]}.", "File Organizer");
                     return true;
                 }
                 default:

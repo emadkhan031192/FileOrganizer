@@ -70,7 +70,11 @@ public static class TransferHelper
     public static async Task<BatchResult> RunTransferWithProgressAsync(
         Window owner, IReadOnlyCollection<string> items, Destination destination, TransferMode mode, ConflictPolicy conflict)
     {
-        var progressWindow = new ProgressWindow($"{mode} {items.Count} item(s) → {destination.Name}") { Owner = owner };
+        var progressWindow = new ProgressWindow($"{mode} {items.Count} item(s) → {destination.Name}")
+        {
+            Owner = owner,
+            WindowStartupLocation = WindowStartupLocation.CenterScreen,
+        };
         var progress = progressWindow.CreateProgress();
         progressWindow.Show();
         try
@@ -88,7 +92,11 @@ public static class TransferHelper
     public static async Task<BatchResult> RunApplyWithProgressAsync(
         Window owner, IReadOnlyCollection<(string Source, string Destination)> pairs, TransferMode mode, ConflictPolicy conflict)
     {
-        var progressWindow = new ProgressWindow($"{mode} {pairs.Count} file(s)") { Owner = owner };
+        var progressWindow = new ProgressWindow($"{mode} {pairs.Count} file(s)")
+        {
+            Owner = owner,
+            WindowStartupLocation = WindowStartupLocation.CenterScreen,
+        };
         var progress = progressWindow.CreateProgress();
         progressWindow.Show();
         try

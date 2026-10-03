@@ -73,6 +73,22 @@ New-Item -Path "$folderKey\command" -Force | Out-Null
 Set-ItemProperty -Path $folderKey -Name "MUIVerb" -Value "Add as Organizer Destination"
 Set-Item -Path "$folderKey\command" -Value "`"$ExePath`" --add-destination `"%1`""
 
+# Right-click a folder -> organize its contents.
+$organizeKey = "HKCU:\Software\Classes\Directory\shell\OrganizerOrganizeFolder"
+Remove-Item $organizeKey -Recurse -Force -ErrorAction SilentlyContinue
+New-Item -Path "$organizeKey\command" -Force | Out-Null
+Set-ItemProperty -Path $organizeKey -Name "MUIVerb" -Value "⚡ Organize this folder"
+Set-ItemProperty -Path $organizeKey -Name "Icon" -Value "`"$ExePath`",0"
+Set-Item -Path "$organizeKey\command" -Value "`"$ExePath`" --organize `"%1`""
+
+# Right-click empty space inside a folder -> organize the folder you are in.
+$organizeHereKey = "HKCU:\Software\Classes\Directory\Background\shell\OrganizerOrganizeHere"
+Remove-Item $organizeHereKey -Recurse -Force -ErrorAction SilentlyContinue
+New-Item -Path "$organizeHereKey\command" -Force | Out-Null
+Set-ItemProperty -Path $organizeHereKey -Name "MUIVerb" -Value "⚡ Organize this folder"
+Set-ItemProperty -Path $organizeHereKey -Name "Icon" -Value "`"$ExePath`",0"
+Set-Item -Path "$organizeHereKey\command" -Value "`"$ExePath`" --organize `"%V`""
+
 # Send To fallback shortcuts (one per destination).
 $sendTo = [Environment]::GetFolderPath("SendTo")
 Get-ChildItem $sendTo -Filter "Move to *.lnk" -ErrorAction SilentlyContinue | Remove-Item -Force

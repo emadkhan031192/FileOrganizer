@@ -6,6 +6,8 @@ $ErrorActionPreference = "SilentlyContinue"
 Remove-Item "HKCU:\Software\Classes\*\shell\MoveToOrganizer" -Recurse -Force
 Remove-Item "HKCU:\Software\Classes\Directory\shell\MoveToOrganizer" -Recurse -Force
 Remove-Item "HKCU:\Software\Classes\Directory\shell\OrganizerAddDestination" -Recurse -Force
+Remove-Item "HKCU:\Software\Classes\Directory\shell\OrganizerOrganizeFolder" -Recurse -Force
+Remove-Item "HKCU:\Software\Classes\Directory\Background\shell\OrganizerOrganizeHere" -Recurse -Force
 
 $sendTo = [Environment]::GetFolderPath("SendTo")
 Get-ChildItem $sendTo -Filter "Move to *.lnk" | Remove-Item -Force

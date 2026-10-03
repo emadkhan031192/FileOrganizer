@@ -20,6 +20,8 @@ public static class ContextMenuService
     private const string FileMenuRoot = @"Software\Classes\*\shell\MoveToOrganizer";
     private const string FolderMenuRoot = @"Software\Classes\Directory\shell\MoveToOrganizer";
     private const string FolderAddKey = @"Software\Classes\Directory\shell\OrganizerAddDestination";
+    private const string FolderOrganizeKey = @"Software\Classes\Directory\shell\OrganizerOrganizeFolder";
+    private const string FolderBackgroundOrganizeKey = @"Software\Classes\Directory\Background\shell\OrganizerOrganizeHere";
 
     private static string ExePath => Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "FileOrganizer.exe");
 
@@ -32,6 +34,20 @@ public static class ContextMenuService
         folderAdd.SetValue("MUIVerb", "Add as Organizer Destination");
         using (var cmd = folderAdd.CreateSubKey("command"))
             cmd.SetValue("", $"\"{ExePath}\" --add-destination \"%1\"");
+
+        // Right-click a folder → organize the contents of that folder.
+        using var organize = Registry.CurrentUser.CreateSubKey(FolderOrganizeKey);
+        organize.SetValue("MUIVerb", "⚡ Organize this folder");
+        organize.SetValue("Icon", $"\"{ExePath}\",0");
+        using (var cmd = organize.CreateSubKey("command"))
+            cmd.SetValue("", $"\"{ExePath}\" --organize \"%1\"");
+
+        // Right-click empty space inside a folder → organize the folder you are in ("%V" = current folder).
+        using var organizeHere = Registry.CurrentUser.CreateSubKey(FolderBackgroundOrganizeKey);
+        organizeHere.SetValue("MUIVerb", "⚡ Organize this folder");
+        organizeHere.SetValue("Icon", $"\"{ExePath}\",0");
+        using (var cmd = organizeHere.CreateSubKey("command"))
+            cmd.SetValue("", $"\"{ExePath}\" --organize \"%V\"");
 
         InstallSendToShortcuts(config);
     }
@@ -65,6 +81,8 @@ public static class ContextMenuService
         try { Registry.CurrentUser.DeleteSubKeyTree(FileMenuRoot, throwOnMissingSubKey: false); } catch (ArgumentException) { }
         try { Registry.CurrentUser.DeleteSubKeyTree(FolderMenuRoot, throwOnMissingSubKey: false); } catch (ArgumentException) { }
         try { Registry.CurrentUser.DeleteSubKeyTree(FolderAddKey, throwOnMissingSubKey: false); } catch (ArgumentException) { }
+        try { Registry.CurrentUser.DeleteSubKeyTree(FolderOrganizeKey, throwOnMissingSubKey: false); } catch (ArgumentException) { }
+        try { Registry.CurrentUser.DeleteSubKeyTree(FolderBackgroundOrganizeKey, throwOnMissingSubKey: false); } catch (ArgumentException) { }
         foreach (var file in Directory.EnumerateFiles(SendToFolder, "Move to *.lnk"))
             File.Delete(file);
     }
