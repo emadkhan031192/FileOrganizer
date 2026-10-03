@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- net8.0-windows + WPF. EnableWindowsTargeting lets this project restore/build
+         on a non-Windows machine (e.g. to verify it in CI); it only RUNS on Windows. -->
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>FileOrganizer.App</RootNamespace>
+    <AssemblyName>FileOrganizer</AssemblyName>
+    <Product>File Organizer — Explorer Companion</Product>
+    <Version>1.0.0</Version>
+    <!-- Release publish (see .github/workflows/build.yml): a self-contained single-file
+         publish produces FileOrganizer.exe with no .NET install needed on the target PC. -->
+    <PublishSingleFile Condition="'$(RuntimeIdentifier)' != ''">false</PublishSingleFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FileOrganizer.Core\FileOrganizer.Core.csproj" />
+  </ItemGroup>
+
+</Project>

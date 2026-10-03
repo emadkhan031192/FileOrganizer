@@ -1,0 +1,85 @@
+<Window x:Class="FileOrganizer.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="File Organizer — Explorer Companion" Width="860" Height="580" MinWidth="640" MinHeight="420"
+        WindowStartupLocation="CenterScreen">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <DockPanel Grid.Row="0" LastChildFill="True">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button x:Name="QuickBarBtn" Content="▣ Quick Bar" Click="QuickBarBtn_Click"/>
+                <Button x:Name="UndoBtn" Content="↶ Undo Last Action" Click="UndoBtn_Click"/>
+                <Button x:Name="SettingsBtn" Content="⚙ Settings" Click="SettingsBtn_Click"/>
+            </StackPanel>
+            <TextBlock Text="FILE ORGANIZER" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
+        </DockPanel>
+
+        <!-- §1/§6 Quick Destinations -->
+        <GroupBox Grid.Row="1" Header="QUICK DESTINATIONS — select file(s) in Explorer, then click a destination (or drop files onto it)" Margin="0,8,0,0">
+            <WrapPanel x:Name="DestinationsPanel" Margin="4"/>
+        </GroupBox>
+
+        <!-- Selected folder + actions -->
+        <GroupBox Grid.Row="2" Header="SELECTED FOLDER" Margin="0,8,0,0">
+            <StackPanel>
+                <DockPanel LastChildFill="True" Margin="0,2,0,0">
+                    <Button DockPanel.Dock="Right" Content="Browse…" Click="BrowseBtn_Click" Margin="6,0,0,0"/>
+                    <ComboBox x:Name="RecentCombo" DockPanel.Dock="Right" Width="150" Margin="6,0,0,0" SelectionChanged="RecentCombo_SelectionChanged">
+                        <ComboBox.ToolTip>Recent folders</ComboBox.ToolTip>
+                    </ComboBox>
+                    <TextBox x:Name="FolderBox" LostFocus="FolderBox_LostFocus"/>
+                </DockPanel>
+                <WrapPanel Margin="0,6,0,0">
+                    <Button x:Name="OrganizeBtn" Content="⚡ ORGANIZE" FontWeight="Bold" Click="OrganizeBtn_Click"/>
+                    <Button x:Name="OrganizeDateBtn" Content="📅 ORGANIZE BY DATE" Click="OrganizeDateBtn_Click"/>
+                    <Button x:Name="DuplicatesBtn" Content="🔄 DUPLICATES" Click="DuplicatesBtn_Click"/>
+                    <Button x:Name="RulesBtn" Content="⚙ RULES" Click="RulesBtn_Click"/>
+                    <TextBlock Text=" Mode:" VerticalAlignment="Center" Margin="10,0,2,0"/>
+                    <ComboBox x:Name="TransferModeCombo" Width="70" SelectedIndex="0">
+                        <ComboBoxItem Tag="Move">Move</ComboBoxItem>
+                        <ComboBoxItem Tag="Copy">Copy</ComboBoxItem>
+                    </ComboBox>
+                    <TextBlock Text=" If exists:" VerticalAlignment="Center" Margin="8,0,2,0"/>
+                    <ComboBox x:Name="ConflictCombo" Width="110" SelectedIndex="0">
+                        <ComboBoxItem Tag="AutoRename">Auto-rename</ComboBoxItem>
+                        <ComboBoxItem Tag="Skip">Skip</ComboBoxItem>
+                        <ComboBoxItem Tag="Replace">Replace</ComboBoxItem>
+                    </ComboBox>
+                </WrapPanel>
+                <DockPanel LastChildFill="True" Margin="0,6,0,2">
+                    <Button DockPanel.Dock="Right" Content="🔍 SEARCH" Click="SearchBtn_Click" Margin="6,0,0,0"/>
+                    <Button DockPanel.Dock="Right" Content="✏️ RENAME…" Click="RenameBtn_Click"/>
+                    <TextBox x:Name="SearchBox" KeyDown="SearchBox_KeyDown">
+                        <TextBox.ToolTip>Search by file name (in the selected folder)…</TextBox.ToolTip>
+                    </TextBox>
+                </DockPanel>
+            </StackPanel>
+        </GroupBox>
+
+        <!-- Results + Recent Activity -->
+        <Grid Grid.Row="3" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <GroupBox Grid.Column="0" Header="SEARCH RESULTS (double-click opens the folder)" Margin="0,0,4,0">
+                <ListBox x:Name="SearchResultsList" MouseDoubleClick="SearchResultsList_MouseDoubleClick"/>
+            </GroupBox>
+            <GroupBox Grid.Column="1" Header="RECENT ACTIVITY" Margin="4,0,0,0">
+                <ListBox x:Name="ActivityList"/>
+            </GroupBox>
+        </Grid>
+
+        <StatusBar Grid.Row="4" Margin="0,8,0,0">
+            <TextBlock x:Name="StatusText" Text="Ready. Tip: select files in Explorer, then click a destination above."/>
+        </StatusBar>
+    </Grid>
+</Window>

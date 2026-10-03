@@ -1,0 +1,20 @@
+<Window x:Class="FileOrganizer.App.QuickBarWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="File Organizer — Quick Bar"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        Topmost="True" ShowInTaskbar="False" SizeToContent="WidthAndHeight"
+        MouseLeftButtonDown="Window_MouseLeftButtonDown">
+    <!-- §6 Quick Destination Bar: a compact floating bar. Select files in Explorer, then
+         click a button here (or drag files onto it) — no need to open the main window. -->
+    <Border Background="#F3F3F3" BorderBrush="#C8C8C8" BorderThickness="1" CornerRadius="8" Padding="6">
+        <StackPanel Orientation="Horizontal">
+            <TextBlock Text="📂" FontSize="16" VerticalAlignment="Center" Margin="2,0,6,0">
+                <TextBlock.ToolTip>Drag to move this bar. Drop files onto a destination button.</TextBlock.ToolTip>
+            </TextBlock>
+            <StackPanel x:Name="ButtonsPanel" Orientation="Horizontal"/>
+            <Button Content="＋" Click="Add_Click" ToolTip="Add destination" Margin="2"/>
+            <Button Content="✕" Click="Close_Click" ToolTip="Hide Quick Bar" Margin="2"/>
+        </StackPanel>
+    </Border>
+</Window>
