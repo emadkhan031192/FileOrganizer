@@ -1,0 +1,20 @@
+## .NET / Visual Studio
+bin/
+obj/
+.vs/
+*.user
+*.suo
+TestResults/
+
+## Publish output
+publish/
+installer/publish/
+installer/output/
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Local .NET SDK used by the build container (not part of the product)
+.dotnet/
+tmp-dotnet/

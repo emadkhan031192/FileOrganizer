@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>FileOrganizer.Core</RootNamespace>
+    <AssemblyName>FileOrganizer.Core</AssemblyName>
+    <Description>Platform-agnostic file organization engine: destinations, rules, organize, rename, duplicates, search, undo.</Description>
+  </PropertyGroup>
+
+</Project>
