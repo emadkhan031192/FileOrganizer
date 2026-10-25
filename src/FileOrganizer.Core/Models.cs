@@ -183,6 +183,15 @@ public sealed class AppPreferences
 
     /// <summary>Watch-folder auto-sort: new files appearing in Downloads are organized automatically (with Undo).</summary>
     public bool WatchDownloads { get; set; }
+
+    /// <summary>First-run setup has been shown once.</summary>
+    public bool SetupDone { get; set; }
+
+    /// <summary>Wheel-only mode: the Quick Bar collapses to a single ◉ circle; dragging files onto it opens the wheel.</summary>
+    public bool WheelOnlyMode { get; set; }
+
+    /// <summary>When true the Quick Bar is translucent until you hover or drag over it.</summary>
+    public bool BarAutoFade { get; set; }
 }
 
 /// <summary>Everything File Organizer persists locally (destinations, rules, categories, presets, recent folders).</summary>
