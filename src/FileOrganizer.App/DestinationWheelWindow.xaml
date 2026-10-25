@@ -1,0 +1,19 @@
+<Window x:Class="FileOrganizer.App.DestinationWheelWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Destination Wheel — drop or click a destination" Width="560" Height="560"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        Topmost="True" ShowInTaskbar="False" WindowStartupLocation="CenterScreen" AllowDrop="True">
+    <Border Background="{DynamicResource CardBg}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="260" Padding="10">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="24" ShadowDepth="4" Opacity="0.25" Color="#1F2937"/>
+        </Border.Effect>
+        <Canvas x:Name="WheelCanvas">
+            <TextBlock x:Name="CenterText" Text="Drop files here" FontSize="16" FontWeight="Bold"
+                       TextAlignment="Center" Canvas.Left="180" Canvas.Top="250" Width="200"/>
+            <TextBlock x:Name="HintText" Text="Click a destination petal to move them there. Esc closes."
+                       FontSize="11" TextAlignment="Center" Canvas.Left="130" Canvas.Top="280" Width="300"/>
+            <Button Content="✕" Canvas.Left="505" Canvas.Top="18" Width="32" Height="32" Click="Close_Click"/>
+        </Canvas>
+    </Border>
+</Window>

@@ -86,7 +86,9 @@ public partial class App : Application
             MessageBox.Show(result.Cancelled
                     ? $"Cancelled — {result.Succeeded} file(s) were already organized in {folder}.\n(↶ Undo in File Organizer reverses them.)"
                     : $"Organized {result.Succeeded} file(s) in {folder}." +
-                      (result.Failed > 0 ? $"\nFailed: {result.Failed}" : ""),
+                      (result.Failed > 0
+                          ? $"\nFailed: {result.Failed} — {result.Files.FirstOrDefault(f => !f.Success && !f.Skipped)?.Error}"
+                          : ""),
                 "File Organizer", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
@@ -118,13 +120,22 @@ public partial class App : Application
                     var result = State.Ops.TransferFiles(files, dest.ExpandedPath,
                         State.Config.Preferences.DefaultTransferMode,
                         State.Config.Preferences.DefaultConflictPolicy);
+                    if (result.Succeeded > 0)
+                        State.RecordDestinationUsed(dest);
                     if (State.Config.Preferences.NotifyAfterQuickMove)
+                    {
+                        // v2 fix for "Moved 0 file(s) to Photos. Failed 1.": the old dialog hid the
+                        // reason. Now it names the file and the exact error, plus the likely fix.
+                        var firstFail = result.Files.FirstOrDefault(f => !f.Success && !f.Skipped);
                         MessageBox.Show(
                             $"Moved {result.Succeeded} file(s) to {dest.Name}." +
                             (result.SkippedCount > 0 ? $"\nSkipped {result.SkippedCount} (already existed)." : "") +
-                            (result.Failed > 0 ? $"\nFailed {result.Failed}." : ""),
+                            (firstFail is not null
+                                ? $"\n\nFailed: {Path.GetFileName(firstFail.SourcePath)}\n{firstFail.Error}\n\nMost common cause: the file is open in another app (e.g. Photos) or still syncing. Close it and try again — nothing was overwritten."
+                                : ""),
                             "File Organizer", MessageBoxButton.OK,
                             result.Failed > 0 ? MessageBoxImage.Warning : MessageBoxImage.Information);
+                    }
                     return true;
                 }
                 case "--add-destination" when args.Length >= 2 && Directory.Exists(args[1]):

@@ -13,8 +13,8 @@ public partial class PreviewWindow : Window
         InitializeComponent();
         Grid.ItemsSource = items;
         var conflicts = items.Count(i => i.HasConflict);
-        SummaryText.Text = $"{items.Count} file(s)" + (conflicts > 0
-            ? $" · {conflicts} name conflict(s) in the destination (handled per your If-exists setting)"
+        SummaryText.Text = $"{items.Count} file(s) · {PathHelpers.FormatSize(items.Sum(i => i.SizeBytes))}" + (conflicts > 0
+            ? $" · {conflicts} name conflict(s) in the destination, shown in red (handled per your If-exists setting)"
             : "");
     }
 

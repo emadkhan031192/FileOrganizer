@@ -18,4 +18,11 @@ public sealed class AppState
     }
 
     public void Save() => ConfigService.Save(Config);
+
+    /// <summary>Smart defaults: remember the last-used destination so the UI can highlight it.</summary>
+    public void RecordDestinationUsed(Destination dest)
+    {
+        dest.LastUsedUtc = DateTime.UtcNow;
+        Save();
+    }
 }
