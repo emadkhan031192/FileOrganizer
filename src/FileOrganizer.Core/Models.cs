@@ -187,6 +187,20 @@ public sealed class AppPreferences
     /// <summary>First-run setup has been shown once.</summary>
     public bool SetupDone { get; set; }
 
+    /// <summary>Mac-style wheel animations (spring petals, hover grow, idle pulse). Off = instant, no motion.</summary>
+    public bool EnableAnimations { get; set; } = true;
+
+    /// <summary>Where the 🗑 Recycle Bin destination appears: "Wheel", "Bar", "Both", or "None".</summary>
+    public string RecycleBinLocation { get; set; } = "Both";
+
+    /// <summary>First-time Recycle Bin warning has been shown (Undo does not restore from the Recycle Bin).</summary>
+    public bool RecycleBinWarned { get; set; }
+
+    /// <summary>Last orb position (screen centre), so the floating circle reopens where you left it.</summary>
+    public double? OrbCenterX { get; set; }
+
+    public double? OrbCenterY { get; set; }
+
     /// <summary>Wheel-only mode: the Quick Bar collapses to a single ◉ circle; dragging files onto it opens the wheel.</summary>
     public bool WheelOnlyMode { get; set; }
 
