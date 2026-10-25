@@ -127,6 +127,7 @@ public partial class QuickBarWindow : Window
     /// <summary>Re-applies Settings (visibility, size) if the bar exists. Called after Settings saves.</summary>
     public static void RefreshIfExists()
     {
+        EdgeBarWindow.RefreshIfExists();
         if (App.State.Config.Preferences.WheelOnlyMode)
         {
             _instance?.Hide();

@@ -46,6 +46,8 @@ public partial class App : Application
 
         if (State.Config.Preferences.ShowQuickBarOnStart)
             QuickBarWindow.ShowBar();
+        if (State.Config.Preferences.EdgeBarEnabled)
+            EdgeBarWindow.ShowEdgeBar();
     }
 
     /// <summary>
