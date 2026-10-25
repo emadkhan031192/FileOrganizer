@@ -4,26 +4,27 @@
         Title="File Organizer — Quick Bar"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         Topmost="True" ShowInTaskbar="False" ShowActivated="False" SizeToContent="WidthAndHeight"
-        MouseLeftButtonDown="Window_MouseLeftButtonDown">
+        MouseLeftButtonDown="Window_MouseLeftButtonDown" AllowDrop="True">
     <!-- §6 Quick Destination Bar: a compact floating bar. Select files/folders in Explorer, then
          click a destination here (or drag items onto it) — no need to open the main window.
-         ⚡ organizes the current Explorer folder; ✏ renames the current selection. -->
-    <Border Background="{DynamicResource CardBg}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="14" Padding="7">
+         ⚡ organizes the current Explorer folder; ✏ renames the current selection.
+         Wheel-only mode (Settings): the whole bar collapses to the single ◉ circle below. -->
+    <Border x:Name="BarBorder" Background="{DynamicResource CardBg}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="14" Padding="7">
         <Border.Effect>
             <DropShadowEffect BlurRadius="16" ShadowDepth="3" Opacity="0.22" Color="#1F2937"/>
         </Border.Effect>
         <StackPanel Orientation="Horizontal">
-            <TextBlock Text="📂" FontSize="17" VerticalAlignment="Center" Margin="3,0,7,0">
+            <TextBlock x:Name="BarIcon" Text="📂" FontSize="17" VerticalAlignment="Center" Margin="3,0,7,0">
                 <TextBlock.ToolTip>File Organizer Quick Bar. Drag to move. Drop files or folders onto a destination button.</TextBlock.ToolTip>
             </TextBlock>
             <StackPanel x:Name="ButtonsPanel" Orientation="Horizontal"/>
             <Button x:Name="OrganizeBtn" Content="⚡" ToolTip="Organize the current Explorer folder (with preview)" Click="Organize_Click" Margin="3"/>
-            <Button Content="◉" ToolTip="Open the destination wheel" Click="Wheel_Click" Margin="3"/>
+            <Button x:Name="WheelBtn" Content="◉" ToolTip="Open the destination wheel (or drop files here)" Click="Wheel_Click" Margin="3"/>
             <Button x:Name="RenameBtn" Content="✏" ToolTip="Rename the selected files/folders" Click="Rename_Click" Margin="3"/>
             <Button x:Name="MenuBtn" Content="☰" ToolTip="Options: open File Organizer, settings, organize, rename" Click="Menu_Click" Margin="3"/>
-            <Button Content="＋" Click="Add_Click" ToolTip="Add destination" Margin="3"/>
-            <Button Content="🏠" Click="Home_Click" ToolTip="Open File Organizer (main window)" Margin="3"/>
-            <Button Content="✕" Click="Close_Click" ToolTip="Hide Quick Bar" Margin="3"/>
+            <Button x:Name="AddBtn" Content="＋" Click="Add_Click" ToolTip="Add destination" Margin="3"/>
+            <Button x:Name="HomeBtn" Content="🏠" Click="Home_Click" ToolTip="Open File Organizer (main window)" Margin="3"/>
+            <Button x:Name="CloseBtn" Content="✕" Click="Close_Click" ToolTip="Hide Quick Bar" Margin="3"/>
         </StackPanel>
     </Border>
 </Window>

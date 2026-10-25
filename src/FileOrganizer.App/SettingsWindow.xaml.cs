@@ -22,6 +22,8 @@ public partial class SettingsWindow : Window
 
         ShowOrganizeOnBarCheck.IsChecked = p.ShowOrganizeOnQuickBar;
         ShowRenameOnBarCheck.IsChecked = p.ShowRenameOnQuickBar;
+        WheelOnlyCheck.IsChecked = p.WheelOnlyMode;
+        BarAutoFadeCheck.IsChecked = p.BarAutoFade;
         BarShowLabelsCheck.IsChecked = p.QuickBarShowLabels;
         SelectTag(BarSizeCombo, p.QuickBarSize);
         SelectTag(ThemeCombo, p.Theme);
@@ -122,6 +124,8 @@ public partial class SettingsWindow : Window
 
         p.ShowOrganizeOnQuickBar = ShowOrganizeOnBarCheck.IsChecked == true;
         p.ShowRenameOnQuickBar = ShowRenameOnBarCheck.IsChecked == true;
+        p.WheelOnlyMode = WheelOnlyCheck.IsChecked == true;
+        p.BarAutoFade = BarAutoFadeCheck.IsChecked == true;
         p.QuickBarShowLabels = BarShowLabelsCheck.IsChecked == true;
         p.QuickBarSize = TagOf(BarSizeCombo, "M");
         p.Theme = TagOf(ThemeCombo, "Light");

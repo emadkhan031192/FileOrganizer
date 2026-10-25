@@ -21,6 +21,16 @@ public partial class QuickBarWindow : Window
         InitializeComponent();
         ApplyBarPreferences();
         RefreshButtons();
+        // Drop files onto the bar itself (especially the ◉ in wheel-only mode) → open the wheel with them.
+        DragOver += (_, e) => { if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effects = DragDropEffects.Move; };
+        Drop += (_, e) =>
+        {
+            if (e.Data.GetData(DataFormats.FileDrop) is string[] dropped)
+                DestinationWheelWindow.ShowWheel(dropped.Where(p => File.Exists(p) || Directory.Exists(p)).ToList());
+        };
+        // Auto-fade: translucent until hovered/dragged over.
+        MouseEnter += (_, _) => Opacity = 1;
+        MouseLeave += (_, _) => Opacity = State.Config.Preferences.BarAutoFade ? 0.55 : 1;
         // Bottom-centre by default, just above the taskbar — close to Explorer without covering it.
         Loaded += (_, _) =>
         {
@@ -124,6 +134,7 @@ public partial class QuickBarWindow : Window
         RenameBtn.Visibility = prefs.ShowRenameOnQuickBar ? Visibility.Visible : Visibility.Collapsed;
         var (pad, font) = prefs.QuickBarSize switch
         {
+            "XS" => (new Thickness(4, 2, 4, 2), 11.0),
             "S" => (new Thickness(7, 3, 7, 3), 12.0),
             "L" => (new Thickness(14, 8, 14, 8), 15.0),
             _ => (new Thickness(10, 5, 10, 5), 13.0),
@@ -133,6 +144,34 @@ public partial class QuickBarWindow : Window
             button.Padding = pad;
             button.FontSize = font;
         }
+
+        // Wheel-only mode: one ◉ pill, everything else hidden. Dragging files onto it opens the wheel.
+        var wheelOnly = prefs.WheelOnlyMode;
+        BarIcon.Visibility = wheelOnly ? Visibility.Collapsed : Visibility.Visible;
+        ButtonsPanel.Visibility = wheelOnly ? Visibility.Collapsed : Visibility.Visible;
+        MenuBtn.Visibility = wheelOnly ? Visibility.Collapsed : Visibility.Visible;
+        AddBtn.Visibility = wheelOnly ? Visibility.Collapsed : Visibility.Visible;
+        HomeBtn.Visibility = wheelOnly ? Visibility.Collapsed : Visibility.Visible;
+        CloseBtn.Visibility = wheelOnly ? Visibility.Collapsed : Visibility.Visible;
+        if (wheelOnly)
+        {
+            OrganizeBtn.Visibility = Visibility.Collapsed;
+            RenameBtn.Visibility = Visibility.Collapsed;
+            WheelBtn.Padding = new Thickness(12, 8, 12, 8);
+            WheelBtn.FontSize = 20;
+            WheelBtn.ToolTip = "Drop files here — the destination wheel opens";
+            BarBorder.CornerRadius = new CornerRadius(24);
+            BarBorder.Padding = new Thickness(4);
+        }
+        else
+        {
+            WheelBtn.Padding = pad;
+            WheelBtn.FontSize = font;
+            WheelBtn.ToolTip = "Open the destination wheel (or drop files here)";
+            BarBorder.CornerRadius = new CornerRadius(14);
+            BarBorder.Padding = new Thickness(7);
+        }
+        Opacity = prefs.BarAutoFade ? 0.55 : 1;
     }
 
     private void RefreshButtons()
@@ -140,6 +179,7 @@ public partial class QuickBarWindow : Window
         var prefs = State.Config.Preferences;
         var (pad, font) = prefs.QuickBarSize switch
         {
+            "XS" => (new Thickness(4, 2, 4, 2), 11.0),
             "S" => (new Thickness(7, 3, 7, 3), 12.0),
             "L" => (new Thickness(14, 8, 14, 8), 15.0),
             _ => (new Thickness(10, 5, 10, 5), 13.0),
@@ -147,6 +187,9 @@ public partial class QuickBarWindow : Window
 
         ButtonsPanel.Children.Clear();
         var destinations = State.Config.Destinations.OrderBy(d => d.SortOrder).ToList();
+        // XS bar: favourites only, so the bar stays a small pill even with many destinations.
+        if (prefs.QuickBarSize == "XS" && destinations.Any(d => d.IsFavorite))
+            destinations = destinations.Where(d => d.IsFavorite).ToList();
         for (var i = 0; i < destinations.Count; i++)
         {
             var dest = destinations[i];
@@ -254,13 +297,20 @@ public partial class QuickBarWindow : Window
 
     private void ShowResult(string label, BatchResult result)
     {
+        var firstFail = result.Files.FirstOrDefault(f => !f.Success && !f.Skipped);
         ToolTip = result.Cancelled
             ? $"⏹ Cancelled — {result.Succeeded} item(s) moved {label} (Undo in main window reverses them)"
             : result.Failed > 0
-                ? $"⚠ {result.Succeeded} moved {label} · {result.Failed} failed · {result.SkippedCount} skipped"
+                ? $"⚠ {result.Succeeded} moved {label} · {result.Failed} failed: {firstFail?.Error} · {result.SkippedCount} skipped"
                 : $"✓ {result.Succeeded} item(s) {label}" + (result.SkippedCount > 0 ? $" · {result.SkippedCount} skipped (already existed)" : "");
-        if (Application.Current.MainWindow is MainWindow main)
-            main.RefreshActivity();
+        // Consistent feedback: the Quick Bar now toasts like the main window, with the failure reason named.
+        if (!result.Cancelled && Application.Current.MainWindow is MainWindow main)
+            ToastWindow.Show(
+                $"✓ {result.Succeeded} item(s) {label}" +
+                (result.Failed > 0 ? $" · {result.Failed} failed: {firstFail?.Error}" : ""),
+                onUndo: () => _ = main.UndoLast());
+        if (Application.Current.MainWindow is MainWindow main2)
+            main2.RefreshActivity();
     }
 
     /// <summary>⚡ Organize: organizes the folder open in Explorer (foreground window), with the §10 preview first. No Explorer folder → small folder picker (never forces the main window open).</summary>
@@ -320,7 +370,7 @@ public partial class QuickBarWindow : Window
             Dialogs.Info("Select one or more files/folders in Explorer first, then click ✏.");
             return;
         }
-        new RenameWindow(items) { Owner = this }.ShowDialog();
+        new RenameWizardWindow(items) { Owner = this }.ShowDialog();
         if (Application.Current.MainWindow is MainWindow main)
             main.RefreshActivity();
     }
@@ -363,6 +413,13 @@ public partial class QuickBarWindow : Window
         }
 
         Item("🏠 Open File Organizer", () => Home_Click(sender, e));
+        Item(State.Config.Preferences.WheelOnlyMode ? "◉ Exit wheel-only mode" : "◉ Wheel-only mode (bar → one circle)", () =>
+        {
+            State.Config.Preferences.WheelOnlyMode = !State.Config.Preferences.WheelOnlyMode;
+            State.Save();
+            ApplyBarPreferences();
+            RefreshButtons();
+        });
         Item("⚙ Open Settings…", () =>
         {
             Home_Click(sender, e);
