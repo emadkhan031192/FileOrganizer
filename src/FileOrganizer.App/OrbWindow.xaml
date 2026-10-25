@@ -10,20 +10,27 @@
             <Setter Property="Height" Value="64"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FontSize" Value="22"/>
-            <Setter Property="Background" Value="{DynamicResource CardBg}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource CardBorder}"/>
+            <!-- Glass neomorphism: soft light surface, white highlight edge, soft outer shadow. -->
+            <Setter Property="Background" Value="#F2F5F9"/>
+            <Setter Property="BorderBrush" Value="#FFFFFF"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Bd" Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1"
                                 CornerRadius="32">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="12" ShadowDepth="4" Opacity="0.22" Color="#8A94A6"/>
+                            </Border.Effect>
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Accent}"/>
                                 <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#DDE3EC"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -32,15 +39,17 @@
         </Style>
     </Window.Resources>
     <Grid x:Name="RootGrid">
+        <!-- Glass glow behind the orb: animated for the pulse, hit-test invisible so it can
+             never steal or change the orb's hover area (the old scale pulse did exactly that). -->
+        <Border x:Name="GlowBorder" Width="72" Height="72" CornerRadius="36"
+                Background="#DCE6F5" Opacity="0.35" IsHitTestVisible="False"
+                HorizontalAlignment="Center" VerticalAlignment="Center"/>
         <!-- Collapsed: one true circle, no rectangular bar behind it. Drag it to move it. -->
         <Border x:Name="OrbBorder" Width="56" Height="56" CornerRadius="28"
-                Background="{DynamicResource CardBg}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1"
-                HorizontalAlignment="Center" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5">
-            <Border.RenderTransform>
-                <ScaleTransform ScaleX="1" ScaleY="1"/>
-            </Border.RenderTransform>
+                Background="#EDF1F6" BorderBrush="#FFFFFF" BorderThickness="2"
+                HorizontalAlignment="Center" VerticalAlignment="Center">
             <Border.Effect>
-                <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.3" Color="#1F2937"/>
+                <DropShadowEffect BlurRadius="16" ShadowDepth="4" Opacity="0.28" Color="#8A94A6"/>
             </Border.Effect>
             <TextBlock Text="◉" FontSize="26" HorizontalAlignment="Center" VerticalAlignment="Center">
                 <TextBlock.ToolTip>File Organizer — hover for the wheel, drag files here, click to open the wheel, right-click for options</TextBlock.ToolTip>

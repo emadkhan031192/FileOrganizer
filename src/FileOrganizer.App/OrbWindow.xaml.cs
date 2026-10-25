@@ -23,9 +23,17 @@ public partial class OrbWindow : Window
     private int _page;
     private bool _expanded;
     private bool _transferring;
+    private bool _draggingOrb;
+    private DateTime _expandedAt = DateTime.MinValue;
     private DispatcherTimer? _hoverTimer;
     private DispatcherTimer? _collapseTimer;
     private Storyboard? _pulse;
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out CursorPoint point);
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct CursorPoint { public int X, Y; }
 
     private OrbWindow()
     {
@@ -135,6 +143,7 @@ public partial class OrbWindow : Window
 
     private void StartHoverTimer()
     {
+        if (_draggingOrb) return;
         StopHoverTimer();
         _hoverTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
         _hoverTimer.Tick += (_, _) => { StopHoverTimer(); Expand(); };
@@ -147,31 +156,43 @@ public partial class OrbWindow : Window
     {
         StopCollapseTimer();
         _collapseTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
-        _collapseTimer.Tick += (_, _) => { StopCollapseTimer(); if (!_transferring) Collapse(); };
+        _collapseTimer.Tick += (_, _) =>
+        {
+            StopCollapseTimer();
+            // Stability: a stray MouseLeave (window resize, a child animating) must not collapse
+            // the wheel while the cursor is actually still inside it. Only collapse on a real exit.
+            if (_transferring || _draggingOrb) return;
+            if ((DateTime.Now - _expandedAt).TotalMilliseconds < 500) { StartCollapseTimer(); return; }
+            if (GetCursorPos(out var p) &&
+                p.X >= Left - 10 && p.X <= Left + Width + 10 &&
+                p.Y >= Top - 10 && p.Y <= Top + Height + 10)
+                return; // cursor still inside — a false leave event, ignore it
+            Collapse();
+        };
         _collapseTimer.Start();
     }
 
     private void StopCollapseTimer() { _collapseTimer?.Stop(); _collapseTimer = null; }
 
+    /// <summary>
+    /// Stability fix: the old pulse scaled the orb itself, so at the orb's edge the mouse kept
+    /// entering/leaving as the orb grew and shrank — the flicker loop. The new pulse only fades
+    /// a hit-test-invisible glow behind the orb, so the hover area never changes size.
+    /// </summary>
     private void StartPulse()
     {
         if (!App.State.Config.Preferences.EnableAnimations || _expanded) return;
         StopPulse();
-        var scale = (System.Windows.Media.ScaleTransform)OrbBorder.RenderTransform;
-        var anim = new DoubleAnimation(1, 1.06, TimeSpan.FromSeconds(1.8))
+        var anim = new DoubleAnimation(0.25, 0.55, TimeSpan.FromSeconds(1.8))
         {
             AutoReverse = true,
             RepeatBehavior = RepeatBehavior.Forever,
             EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
         };
         _pulse = new Storyboard();
-        Storyboard.SetTarget(anim, scale);
-        Storyboard.SetTargetProperty(anim, new PropertyPath("ScaleX"));
-        var animY = anim.Clone();
-        Storyboard.SetTarget(animY, scale);
-        Storyboard.SetTargetProperty(animY, new PropertyPath("ScaleY"));
+        Storyboard.SetTarget(anim, GlowBorder);
+        Storyboard.SetTargetProperty(anim, new PropertyPath("Opacity"));
         _pulse.Children.Add(anim);
-        _pulse.Children.Add(animY);
         _pulse.Begin();
     }
 
@@ -179,16 +200,20 @@ public partial class OrbWindow : Window
     {
         _pulse?.Stop();
         _pulse = null;
-        if (OrbBorder.RenderTransform is System.Windows.Media.ScaleTransform s) { s.ScaleX = 1; s.ScaleY = 1; }
+        GlowBorder.Opacity = 0.35;
     }
 
     private void Orb_DragOrClick(object sender, MouseButtonEventArgs e)
     {
+        _draggingOrb = true;
+        StopHoverTimer();
         var startLeft = Left;
         var startTop = Top;
         try { DragMove(); } catch { /* window not yet shown / drag cancelled */ }
+        _draggingOrb = false;
         SaveCentre();
         // A click (no real drag) toggles the wheel; a drag just moves the orb.
+        // Expanding mid-drag resized the window under the cursor — another flicker source.
         if (Math.Abs(Left - startLeft) < 4 && Math.Abs(Top - startTop) < 4)
         {
             if (_expanded) Collapse(); else Expand();
@@ -207,8 +232,10 @@ public partial class OrbWindow : Window
         Top = Math.Clamp(cy - 160, wa.Top, wa.Bottom - 320);
         _items = ExplorerSelection.GetSelectedFiles();
         OrbBorder.Visibility = Visibility.Collapsed;
+        GlowBorder.Visibility = Visibility.Collapsed;
         WheelCanvas.Visibility = Visibility.Visible;
         _expanded = true;
+        _expandedAt = DateTime.Now;
         BuildWheel();
     }
 
@@ -219,6 +246,7 @@ public partial class OrbWindow : Window
         var cy = Top + Height / 2;
         WheelCanvas.Visibility = Visibility.Collapsed;
         OrbBorder.Visibility = Visibility.Visible;
+        GlowBorder.Visibility = Visibility.Visible;
         Width = 64; Height = 64;
         Left = cx - 32;
         Top = cy - 32;
@@ -342,7 +370,8 @@ public partial class OrbWindow : Window
         if (e.Data.GetData(DataFormats.FileDrop) is string[] dropped)
         {
             _items = dropped.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
-            if (!_expanded) Expand(); else BuildWheel();
+            // Don't rebuild (and re-animate) the wheel on every drop — that was flicker too.
+            if (!_expanded) Expand(); else CenterText.Text = DefaultCentreText;
         }
     }
 

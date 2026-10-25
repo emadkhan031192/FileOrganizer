@@ -187,6 +187,9 @@ public sealed class AppPreferences
     /// <summary>First-run setup has been shown once.</summary>
     public bool SetupDone { get; set; }
 
+    /// <summary>Left-edge liquid bar: a thin glass peek strip on the left screen edge that slides in with destinations.</summary>
+    public bool EdgeBarEnabled { get; set; } = true;
+
     /// <summary>Mac-style wheel animations (spring petals, hover grow, idle pulse). Off = instant, no motion.</summary>
     public bool EnableAnimations { get; set; } = true;
 

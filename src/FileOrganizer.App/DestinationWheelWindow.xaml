@@ -5,20 +5,23 @@
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         Topmost="True" ShowInTaskbar="False" WindowStartupLocation="Manual" AllowDrop="True" Opacity="0.97">
     <Window.Resources>
-        <!-- Small Mac-style petal: a true circle, icon only, accent glow on hover. -->
+        <!-- Glass neomorphism petal: soft light surface, white highlight, soft shadow. -->
         <Style x:Key="PetalButton" TargetType="Button">
             <Setter Property="Width" Value="64"/>
             <Setter Property="Height" Value="64"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FontSize" Value="22"/>
-            <Setter Property="Background" Value="{DynamicResource CardBg}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource CardBorder}"/>
+            <Setter Property="Background" Value="#F2F5F9"/>
+            <Setter Property="BorderBrush" Value="#FFFFFF"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Bd" Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1"
                                 CornerRadius="32">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="12" ShadowDepth="4" Opacity="0.22" Color="#8A94A6"/>
+                            </Border.Effect>
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -26,15 +29,21 @@
                                 <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Accent}"/>
                                 <Setter Property="Foreground" Value="White"/>
                             </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#DDE3EC"/>
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
     </Window.Resources>
-    <Border Background="{DynamicResource CardBg}" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1" CornerRadius="160" Padding="10">
+    <Border BorderBrush="#FFFFFF" BorderThickness="1" CornerRadius="160" Padding="10">
+        <Border.Background>
+            <SolidColorBrush Color="#EAF0F6" Opacity="0.94"/>
+        </Border.Background>
         <Border.Effect>
-            <DropShadowEffect BlurRadius="18" ShadowDepth="3" Opacity="0.25" Color="#1F2937"/>
+            <DropShadowEffect BlurRadius="22" ShadowDepth="4" Opacity="0.28" Color="#8A94A6"/>
         </Border.Effect>
         <Canvas x:Name="WheelCanvas">
             <TextBlock x:Name="CenterText" Text="Drop files here" FontSize="12" FontWeight="Bold"
