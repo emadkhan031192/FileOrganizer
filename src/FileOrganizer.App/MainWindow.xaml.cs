@@ -37,8 +37,19 @@ public partial class MainWindow : Window
         WatchCheck.IsChecked = State.Config.Preferences.WatchDownloads;
         if (State.Config.Preferences.WatchDownloads)
             StartWatching();
+        Loaded += (_, _) => ShowFirstRunOnce();
         SourceInitialized += MainWindow_SourceInitialized;
         Closed += MainWindow_Closed;
+    }
+
+    private void ShowFirstRunOnce()
+    {
+        if (State.Config.Preferences.SetupDone) return;
+        new FirstRunWindow { Owner = this }.ShowDialog();
+        WatchCheck.IsChecked = State.Config.Preferences.WatchDownloads;
+        if (State.Config.Preferences.WatchDownloads) StartWatching(); else StopWatching();
+        QuickBarWindow.RefreshIfExists();
+        RefreshDestinations();
     }
 
     private void MainWindow_SourceInitialized(object? sender, EventArgs e)
@@ -438,7 +449,7 @@ public partial class MainWindow : Window
     {
         var files = Dialogs.GetFilesToActOn();
         if (files.Count == 0) { SetStatus("No files selected for rename."); return; }
-        new RenameWindow(files) { Owner = this }.ShowDialog();
+        new RenameWizardWindow(files) { Owner = this }.ShowDialog();
         RefreshActivity();
     }
 
@@ -489,6 +500,7 @@ public partial class MainWindow : Window
         var downloads = KnownFolder.Downloads;
         if (!Directory.Exists(downloads)) return;
         _watcher = new FileSystemWatcher(downloads) { EnableRaisingEvents = true, IncludeSubdirectories = false };
+        WatchDot.Visibility = Visibility.Visible;
         _watcher.Created += (_, args) =>
         {
             lock (_watchQueue) _watchQueue.Add(args.FullPath);
@@ -506,6 +518,7 @@ public partial class MainWindow : Window
     private void StopWatching()
     {
         _watchTimer?.Stop();
+        WatchDot.Visibility = Visibility.Collapsed;
         if (_watcher is not null) { _watcher.EnableRaisingEvents = false; _watcher.Dispose(); _watcher = null; }
     }
 
