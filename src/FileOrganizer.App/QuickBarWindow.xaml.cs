@@ -159,15 +159,42 @@ public partial class QuickBarWindow : Window
             RenameBtn.Visibility = Visibility.Collapsed;
             WheelBtn.Padding = new Thickness(12, 8, 12, 8);
             WheelBtn.FontSize = 20;
-            WheelBtn.ToolTip = "Drop files here — the destination wheel opens";
+            WheelBtn.ToolTip = "Drop files here — the destination wheel opens (right-click for Settings / exit wheel-only mode)";
             BarBorder.CornerRadius = new CornerRadius(24);
             BarBorder.Padding = new Thickness(4);
+            // Wheel-only escape hatch: the ☰ menu is hidden in this mode, so the circle
+            // itself carries a right-click menu (Open / Settings / Exit wheel-only mode).
+            var menu = new ContextMenu();
+            MenuItem WItem(string header, Action action)
+            {
+                var item = new MenuItem { Header = header };
+                item.Click += (_, _) => action();
+                menu.Items.Add(item);
+                return item;
+            }
+            WItem("🏠 Open File Organizer", () => Home_Click(this, new RoutedEventArgs()));
+            WItem("⚙ Open Settings…", () =>
+            {
+                Home_Click(this, new RoutedEventArgs());
+                new SettingsWindow { Owner = this }.ShowDialog();
+                ApplyBarPreferences();
+                RefreshButtons();
+            });
+            WItem("◉ Exit wheel-only mode", () =>
+            {
+                State.Config.Preferences.WheelOnlyMode = false;
+                State.Save();
+                ApplyBarPreferences();
+                RefreshButtons();
+            });
+            WheelBtn.ContextMenu = menu;
         }
         else
         {
             WheelBtn.Padding = pad;
             WheelBtn.FontSize = font;
             WheelBtn.ToolTip = "Open the destination wheel (or drop files here)";
+            WheelBtn.ContextMenu = null;
             BarBorder.CornerRadius = new CornerRadius(14);
             BarBorder.Padding = new Thickness(7);
         }
