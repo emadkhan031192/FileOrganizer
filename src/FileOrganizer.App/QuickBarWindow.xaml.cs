@@ -109,9 +109,14 @@ public partial class QuickBarWindow : Window
         public int Left, Top, Right, Bottom;
     }
 
-    /// <summary>Shows the single floating Quick Bar, creating it on first use.</summary>
+    /// <summary>Shows the single floating Quick Bar, creating it on first use. Wheel-only mode shows the orb instead.</summary>
     public static void ShowBar()
     {
+        if (App.State.Config.Preferences.WheelOnlyMode)
+        {
+            OrbWindow.ShowOrb();
+            return;
+        }
         _instance ??= new QuickBarWindow();
         _instance.ApplyBarPreferences();
         _instance.RefreshButtons();
@@ -122,6 +127,12 @@ public partial class QuickBarWindow : Window
     /// <summary>Re-applies Settings (visibility, size) if the bar exists. Called after Settings saves.</summary>
     public static void RefreshIfExists()
     {
+        if (App.State.Config.Preferences.WheelOnlyMode)
+        {
+            _instance?.Hide();
+            OrbWindow.ShowOrb();
+            return;
+        }
         if (_instance is null) return;
         _instance.ApplyBarPreferences();
         _instance.RefreshButtons();
@@ -239,7 +250,46 @@ public partial class QuickBarWindow : Window
             button.ContextMenu = BuildDestinationMenu(dest);
             ButtonsPanel.Children.Add(button);
         }
+        if (State.Config.Preferences.RecycleBinLocation is "Bar" or "Both")
+        {
+            var recycle = new Button
+            {
+                Style = (Style)FindResource("DestinationButton"),
+                Content = prefs.QuickBarShowLabels ? "🗑 Recycle Bin" : "🗑",
+                AllowDrop = true,
+                Margin = new Thickness(3),
+                Padding = pad,
+                FontSize = font,
+                ToolTip = "Send selected file(s)/folder(s) to the Windows Recycle Bin",
+                Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFE, 0xE2, 0xE2)),
+            };
+            recycle.Click += Recycle_Click;
+            recycle.DragOver += (s, e) => { if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effects = DragDropEffects.Move; };
+            recycle.Drop += Recycle_Drop;
+            ButtonsPanel.Children.Add(recycle);
+        }
         ApplyBarPreferences(); // keep action buttons at the chosen size too
+    }
+
+    private async void Recycle_Click(object sender, RoutedEventArgs e)
+    {
+        var items = ExplorerSelection.GetSelectedFiles();
+        if (items.Count == 0) return;
+        ToastWindow.Show(await RecycleBinService.RecycleAsync(items));
+        if (Application.Current.MainWindow is MainWindow main)
+            main.RefreshActivity();
+    }
+
+    private async void Recycle_Drop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(DataFormats.FileDrop) is string[] dropped)
+        {
+            var items = dropped.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
+            if (items.Count == 0) return;
+            ToastWindow.Show(await RecycleBinService.RecycleAsync(items));
+            if (Application.Current.MainWindow is MainWindow main)
+                main.RefreshActivity();
+        }
     }
 
     private ContextMenu BuildDestinationMenu(Destination dest)

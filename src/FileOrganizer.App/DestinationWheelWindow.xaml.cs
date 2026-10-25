@@ -72,7 +72,8 @@ public partial class DestinationWheelWindow : Window
         var hasMore = pages > 1;
         // With paging, reserve the last slot for "⋯ More".
         var shown = hasMore ? pageDests.Take(pageSize - 1).ToList() : pageDests;
-        var slots = shown.Count + (hasMore ? 1 : 0);
+        var showRecycle = App.State.Config.Preferences.RecycleBinLocation is "Wheel" or "Both";
+        var slots = shown.Count + (hasMore ? 1 : 0) + (showRecycle ? 1 : 0);
 
         const double cx = 160, cy = 160, radius = 112, w = 64, h = 64;
         for (var i = 0; i < shown.Count; i++)
@@ -97,9 +98,29 @@ public partial class DestinationWheelWindow : Window
             WheelCanvas.Children.Add(button);
         }
 
-        if (hasMore)
+        if (showRecycle)
         {
             var angle = -Math.PI / 2 + shown.Count * 2 * Math.PI / slots;
+            var recycle = new Button
+            {
+                Style = (Style)FindResource("PetalButton"),
+                Tag = "recycle",
+                Content = "🗑",
+                ToolTip = "Recycle Bin — sends files to the Windows Recycle Bin",
+                Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xDC, 0x26, 0x26)),
+                Foreground = System.Windows.Media.Brushes.White,
+            };
+            recycle.Click += Recycle_Click;
+            recycle.MouseEnter += (_, _) => CenterText.Text = "🗑 Recycle Bin";
+            recycle.MouseLeave += (_, _) => CenterText.Text = DefaultCentreText;
+            Canvas.SetLeft(recycle, cx + radius * Math.Cos(angle) - w / 2);
+            Canvas.SetTop(recycle, cy + radius * Math.Sin(angle) - h / 2);
+            WheelCanvas.Children.Add(recycle);
+        }
+
+        if (hasMore)
+        {
+            var angle = -Math.PI / 2 + (shown.Count + (showRecycle ? 1 : 0)) * 2 * Math.PI / slots;
             var more = new Button
             {
                 Style = (Style)FindResource("PetalButton"),
@@ -157,6 +178,17 @@ public partial class DestinationWheelWindow : Window
         {
             _transferring = false;
         }
+    }
+
+    private async void Recycle_Click(object sender, RoutedEventArgs e)
+    {
+        var items = _items.Count > 0 ? _items : ExplorerSelection.GetSelectedFiles();
+        if (items.Count == 0) { BuildWheel(); return; }
+        var message = await RecycleBinService.RecycleAsync(items);
+        Close();
+        ToastWindow.Show(message);
+        if (Application.Current.MainWindow is MainWindow main)
+            main.RefreshActivity();
     }
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();

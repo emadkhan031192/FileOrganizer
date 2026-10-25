@@ -177,6 +177,37 @@ public partial class MainWindow : Window
         var add = new Button { Content = "+ Add Destination", Style = (Style)FindResource("DestinationButton") };
         add.Click += AddDestination_Click;
         DestinationsPanel.Children.Add(add);
+
+        if (State.Config.Preferences.RecycleBinLocation != "None")
+        {
+            var recycle = new Button
+            {
+                Content = "🗑 Recycle Bin",
+                Style = (Style)FindResource("DestinationButton"),
+                AllowDrop = true,
+                Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFE, 0xE2, 0xE2)),
+                ToolTip = "Send selected file(s)/folder(s) to the Windows Recycle Bin (restore from there, not via Undo)",
+            };
+            recycle.Click += async (_, _) =>
+            {
+                var items = ExplorerSelection.GetSelectedFiles();
+                if (items.Count == 0) { SetStatus("Nothing selected in Explorer to recycle."); return; }
+                ToastWindow.Show(await RecycleBinService.RecycleAsync(items));
+                RefreshActivity();
+            };
+            recycle.DragOver += (s, e) => { if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effects = DragDropEffects.Move; };
+            recycle.Drop += async (_, e) =>
+            {
+                if (e.Data.GetData(DataFormats.FileDrop) is string[] dropped)
+                {
+                    var items = dropped.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
+                    if (items.Count == 0) return;
+                    ToastWindow.Show(await RecycleBinService.RecycleAsync(items));
+                    RefreshActivity();
+                }
+            };
+            DestinationsPanel.Children.Add(recycle);
+        }
     }
 
     /// <summary>Parents first (by SortOrder), each followed by its children — so sub-destinations stay grouped (§6).</summary>

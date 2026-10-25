@@ -20,8 +20,18 @@
                 </StackPanel>
 
                 <TextBlock Text="QUICK BAR CUSTOMIZATION" FontWeight="Bold" Margin="0,16,0,0"/>
-                <CheckBox x:Name="WheelOnlyCheck" Content="Wheel-only mode — bar collapses to a single ◉ circle; drop files on it to open the wheel" Margin="0,6,0,0"/>
+                <CheckBox x:Name="WheelOnlyCheck" Content="Orb mode — a small circular ◉ floating button instead of the bar; hover it for the wheel" Margin="0,6,0,0"/>
                 <CheckBox x:Name="BarAutoFadeCheck" Content="Auto-fade bar — translucent until you hover or drag over it" Margin="0,4,0,0"/>
+                <CheckBox x:Name="EnableAnimationsCheck" Content="Wheel animations — petals spring out, orb pulses gently (off = instant)" Margin="0,4,0,0"/>
+                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                    <TextBlock Text="Recycle Bin in:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ComboBox x:Name="RecycleBinCombo" Width="150" SelectedIndex="2">
+                        <ComboBoxItem Tag="Wheel">Wheel only</ComboBoxItem>
+                        <ComboBoxItem Tag="Bar">Bar only</ComboBoxItem>
+                        <ComboBoxItem Tag="Both">Wheel + bar</ComboBoxItem>
+                        <ComboBoxItem Tag="None">Nowhere</ComboBoxItem>
+                    </ComboBox>
+                </StackPanel>
                 <CheckBox x:Name="ShowOrganizeOnBarCheck" Content="Show ⚡ Organize button on the bar" Margin="0,6,0,0"/>
                 <CheckBox x:Name="ShowRenameOnBarCheck" Content="Show ✏ Rename button on the bar" Margin="0,4,0,0"/>
                 <CheckBox x:Name="BarShowLabelsCheck" Content="Show destination names next to icons (off = icons only)" Margin="0,4,0,0"/>

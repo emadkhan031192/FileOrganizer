@@ -24,6 +24,8 @@ public partial class SettingsWindow : Window
         ShowRenameOnBarCheck.IsChecked = p.ShowRenameOnQuickBar;
         WheelOnlyCheck.IsChecked = p.WheelOnlyMode;
         BarAutoFadeCheck.IsChecked = p.BarAutoFade;
+        EnableAnimationsCheck.IsChecked = p.EnableAnimations;
+        SelectTag(RecycleBinCombo, p.RecycleBinLocation);
         BarShowLabelsCheck.IsChecked = p.QuickBarShowLabels;
         SelectTag(BarSizeCombo, p.QuickBarSize);
         SelectTag(ThemeCombo, p.Theme);
@@ -126,6 +128,8 @@ public partial class SettingsWindow : Window
         p.ShowRenameOnQuickBar = ShowRenameOnBarCheck.IsChecked == true;
         p.WheelOnlyMode = WheelOnlyCheck.IsChecked == true;
         p.BarAutoFade = BarAutoFadeCheck.IsChecked == true;
+        p.EnableAnimations = EnableAnimationsCheck.IsChecked == true;
+        p.RecycleBinLocation = TagOf(RecycleBinCombo, "Both");
         p.QuickBarShowLabels = BarShowLabelsCheck.IsChecked == true;
         p.QuickBarSize = TagOf(BarSizeCombo, "M");
         p.Theme = TagOf(ThemeCombo, "Light");
