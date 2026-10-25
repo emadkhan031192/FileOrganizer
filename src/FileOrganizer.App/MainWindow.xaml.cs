@@ -484,6 +484,21 @@ public partial class MainWindow : Window
         RefreshActivity();
     }
 
+    /// <summary>Simple Rename, back up front: one file, just type its new name (the wizard shows that panel for a single file).</summary>
+    private void SimpleRenameBtn_Click(object sender, RoutedEventArgs e)
+    {
+        var files = Dialogs.GetFilesToActOn();
+        if (files.Count == 0) { SetStatus("No files selected for rename."); return; }
+        if (files.Count > 1)
+        {
+            SetStatus("Simple Rename works on one file — select just one, or use ✏️ Rename for many.");
+            Dialogs.Info("Simple Rename works on a single file.\nSelect just one file in Explorer, or use ✏️ Rename for many files at once.");
+            return;
+        }
+        new RenameWizardWindow(files) { Owner = this }.ShowDialog();
+        RefreshActivity();
+    }
+
     private void DuplicatesBtn_Click(object sender, RoutedEventArgs e)
     {
         new DuplicatesWindow(FolderBox.Text.Trim()) { Owner = this }.ShowDialog();

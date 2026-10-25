@@ -10,8 +10,12 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- §7 Batch Rename controls -->
+        <!-- §7 Batch Rename controls — Advanced view, grouped in plain steps with a live example. -->
         <StackPanel Grid.Row="0">
+            <TextBlock Text="Advanced rename — the easy wizard covers most jobs; this is for everything else." FontWeight="SemiBold" TextWrapping="Wrap"/>
+            <TextBlock x:Name="ExampleText" Margin="0,4,0,6" Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap"
+                       Text="Example: type below and the new name appears here."/>
+            <TextBlock Text="1 — Change words" FontWeight="SemiBold"/>
             <WrapPanel>
                 <StackPanel Margin="0,0,12,6">
                     <TextBlock Text="Replace text"/>
@@ -44,6 +48,7 @@
                 </StackPanel>
             </WrapPanel>
             <WrapPanel Margin="0,4,0,0">
+                <TextBlock Text="2 — Add a date or numbers" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0"/>
                 <CheckBox x:Name="AddDateCheck" Content="Add date" VerticalAlignment="Center"/>
                 <ComboBox x:Name="DateFormatCombo" Width="130" SelectedIndex="0" Margin="6,0,0,0">
                     <ComboBoxItem>yyyy-MM-dd</ComboBoxItem>
@@ -63,7 +68,8 @@
                 <Button Content="Preview" Click="Preview_Click" Margin="14,0,0,0"/>
             </WrapPanel>
             <WrapPanel Margin="0,4,0,0">
-                <TextBlock Text="Rename Presets:" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <TextBlock Text="3 — Saved recipes" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <TextBlock Text="Rename Presets:" VerticalAlignment="Center" Margin="0,0,6,0"/>
                 <ComboBox x:Name="PresetCombo" Width="190" Margin="0,0,6,0">
                     <ComboBox.ToolTip>Presets: Capitalize Words, Make Web-safe, Number Files, Time-Stamp Names, Underscores to Spaces, Unique Number</ComboBox.ToolTip>
                 </ComboBox>

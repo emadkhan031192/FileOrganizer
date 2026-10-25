@@ -139,6 +139,10 @@ public partial class RenameWindow : Window
     {
         _preview = RenameEngine.BuildPreview(_files, ReadOptions());
         Grid.ItemsSource = _preview;
+        var first = _preview.FirstOrDefault();
+        ExampleText.Text = first is not null
+            ? $"Example: {first.OldName} → {first.NewName}" + (_preview.Count > 1 ? $"  ·  {_preview.Count} files" : "")
+            : "Example: type above and the new name appears here.";
     }
 
     private void Preview_Click(object sender, RoutedEventArgs e) => RefreshPreview();

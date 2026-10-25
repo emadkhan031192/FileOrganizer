@@ -89,6 +89,7 @@
                 <StackPanel Margin="4">
                     <WrapPanel>
                         <Button x:Name="RenameBtn" Content="✏️ RENAME…" Click="RenameBtn_Click"/>
+                        <Button x:Name="SimpleRenameBtn" Content="✎ SIMPLE RENAME…" Click="SimpleRenameBtn_Click"/>
                         <Button x:Name="DuplicatesBtn" Content="🔄 DUPLICATES" Click="DuplicatesBtn_Click"/>
                         <Button x:Name="RulesBtn" Content="⚙ RULES" Click="RulesBtn_Click"/>
                     </WrapPanel>

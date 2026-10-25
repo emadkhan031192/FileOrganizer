@@ -23,6 +23,7 @@ public partial class SettingsWindow : Window
         ShowOrganizeOnBarCheck.IsChecked = p.ShowOrganizeOnQuickBar;
         ShowRenameOnBarCheck.IsChecked = p.ShowRenameOnQuickBar;
         WheelOnlyCheck.IsChecked = p.WheelOnlyMode;
+        EdgeBarCheck.IsChecked = p.EdgeBarEnabled;
         BarAutoFadeCheck.IsChecked = p.BarAutoFade;
         EnableAnimationsCheck.IsChecked = p.EnableAnimations;
         SelectTag(RecycleBinCombo, p.RecycleBinLocation);
@@ -127,6 +128,7 @@ public partial class SettingsWindow : Window
         p.ShowOrganizeOnQuickBar = ShowOrganizeOnBarCheck.IsChecked == true;
         p.ShowRenameOnQuickBar = ShowRenameOnBarCheck.IsChecked == true;
         p.WheelOnlyMode = WheelOnlyCheck.IsChecked == true;
+        p.EdgeBarEnabled = EdgeBarCheck.IsChecked == true;
         p.BarAutoFade = BarAutoFadeCheck.IsChecked == true;
         p.EnableAnimations = EnableAnimationsCheck.IsChecked == true;
         p.RecycleBinLocation = TagOf(RecycleBinCombo, "Both");

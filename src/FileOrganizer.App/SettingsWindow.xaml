@@ -21,6 +21,7 @@
 
                 <TextBlock Text="QUICK BAR CUSTOMIZATION" FontWeight="Bold" Margin="0,16,0,0"/>
                 <CheckBox x:Name="WheelOnlyCheck" Content="Orb mode — a small circular ◉ floating button instead of the bar; hover it for the wheel" Margin="0,6,0,0"/>
+                <CheckBox x:Name="EdgeBarCheck" Content="Left-edge liquid bar — a thin glass strip on the left screen edge; push the cursor (or files) to the edge to open it" Margin="0,4,0,0"/>
                 <CheckBox x:Name="BarAutoFadeCheck" Content="Auto-fade bar — translucent until you hover or drag over it" Margin="0,4,0,0"/>
                 <CheckBox x:Name="EnableAnimationsCheck" Content="Wheel animations — petals spring out, orb pulses gently (off = instant)" Margin="0,4,0,0"/>
                 <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
