@@ -50,6 +50,11 @@ public sealed class PreviewItem
     /// <summary>Human-readable reason, e.g. "Rule: CVs to Jobs", "PDF → Documents\PDF", "Other".</summary>
     public required string Reason { get; init; }
 
+    /// <summary>File size in bytes (0 when unreadable). Powers the preview's "12 files · 84 MB" total.</summary>
+    public long SizeBytes { get; init; }
+
+    public string SizeText => PathHelpers.FormatSize(SizeBytes);
+
     /// <summary>True when a different file already occupies DestinationPath (handled per ConflictPolicy at execute time).</summary>
     public bool HasConflict { get; init; }
 

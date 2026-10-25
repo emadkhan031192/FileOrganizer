@@ -79,6 +79,18 @@ public sealed class HistoryService
             return _entries.OrderByDescending(e => e.TimestampUtc).Take(count).ToList();
     }
 
+    /// <summary>One undoable batch, for the Undo history window.</summary>
+    public sealed record HistoryBatch(string BatchId, DateTime TimestampUtc, string Kind, int FileCount, bool Undone);
+
+    /// <summary>Newest batches first, one row per BatchId.</summary>
+    public IReadOnlyList<HistoryBatch> Batches(int maxBatches = 30)
+    {
+        lock (_lock)
+            return _entries.GroupBy(e => e.BatchId)
+                .Select(g => new HistoryBatch(g.Key, g.Max(e => e.TimestampUtc), g.First().Kind, g.Count(), g.All(e => e.Undone)))
+                .OrderByDescending(b => b.TimestampUtc).Take(maxBatches).ToList();
+    }
+
     /// <summary>The newest batch that has not been undone yet, or null.</summary>
     public string? LastUndoableBatchId
     {

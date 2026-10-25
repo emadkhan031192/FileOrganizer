@@ -73,10 +73,17 @@ public sealed class OrganizeEngine
                 DestinationPath = destinationPath,
                 Reason = reason,
                 HasConflict = File.Exists(destinationPath),
+                SizeBytes = SafeSize(file),
             });
         }
 
         return items.OrderBy(i => i.DestinationPath, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    /// <summary>Faster scan: enumerate once, skip locked/unreadable files instead of aborting the whole preview.</summary>
+    private static long SafeSize(FileInfo file)
+    {
+        try { return file.Length; } catch (IOException) { return 0; } catch (UnauthorizedAccessException) { return 0; }
     }
 
     private static (string RelativeFolder, string Reason) Classify(

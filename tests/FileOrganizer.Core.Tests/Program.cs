@@ -133,6 +133,9 @@ try
     var engine = new OrganizeEngine(config);
     var preview = engine.BuildPreview(messy);
     Check("preview covers all 7 files", preview.Count == 7, $"count={preview.Count}");
+    Check("preview carries file sizes for the count + MB total",
+        preview.All(p => p.SizeBytes == 1) && preview.Sum(p => p.SizeBytes) == 7,
+        $"total={preview.Sum(p => p.SizeBytes)} B");
     Check("preview sends PDF to Documents\\PDF",
         preview.Any(p => p.FileName == "admission.pdf" && p.DestinationFolder.EndsWith(Path.Combine("Documents", "PDF"))));
     Check("preview sends PNG to Images",

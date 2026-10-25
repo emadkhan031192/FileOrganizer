@@ -52,6 +52,12 @@ public sealed class Destination
     /// <summary>Display order within its level (drag-and-drop reorder writes this).</summary>
     public int SortOrder { get; set; }
 
+    /// <summary>Pinned to the front of the destination wheel and the Move tab.</summary>
+    public bool IsFavorite { get; set; }
+
+    /// <summary>Last time a file was moved to this destination — drives the "last used" highlight.</summary>
+    public DateTime? LastUsedUtc { get; set; }
+
     public string ExpandedPath => Environment.ExpandEnvironmentVariables(Path ?? "");
 
     public override string ToString() => Name;
@@ -174,6 +180,9 @@ public sealed class AppPreferences
 
     /// <summary>Global shortcuts: Explorer selection + Alt+1..Alt+9 moves to destination 1..9. App must be running.</summary>
     public bool EnableHotkeys { get; set; } = true;
+
+    /// <summary>Watch-folder auto-sort: new files appearing in Downloads are organized automatically (with Undo).</summary>
+    public bool WatchDownloads { get; set; }
 }
 
 /// <summary>Everything File Organizer persists locally (destinations, rules, categories, presets, recent folders).</summary>
