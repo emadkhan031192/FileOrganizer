@@ -24,6 +24,16 @@ public partial class RenameWindow : Window
         if (_presets.Count > 0)
             PresetCombo.SelectedIndex = 0;
         RefreshPreview();
+        // v2: live rename preview — typing updates the New name column immediately, no Preview click needed.
+        foreach (var box in new[] { ReplaceFromBox, ReplaceToBox, RemoveTextBox, PrefixBox, SuffixBox, NumberStartBox, NumberPaddingBox })
+            box.TextChanged += (_, _) => RefreshPreview();
+        CaseCombo.SelectionChanged += (_, _) => RefreshPreview();
+        DateFormatCombo.SelectionChanged += (_, _) => RefreshPreview();
+        DatePositionCombo.SelectionChanged += (_, _) => RefreshPreview();
+        AddDateCheck.Checked += (_, _) => RefreshPreview();
+        AddDateCheck.Unchecked += (_, _) => RefreshPreview();
+        AddNumberingCheck.Checked += (_, _) => RefreshPreview();
+        AddNumberingCheck.Unchecked += (_, _) => RefreshPreview();
     }
 
     private RenameOptions ReadOptions() => new()

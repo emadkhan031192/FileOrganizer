@@ -34,6 +34,9 @@ public partial class MainWindow : Window
         RefreshDestinations();
         RefreshActivity();
         RefreshRecentFolders();
+        WatchCheck.IsChecked = State.Config.Preferences.WatchDownloads;
+        if (State.Config.Preferences.WatchDownloads)
+            StartWatching();
         SourceInitialized += MainWindow_SourceInitialized;
         Closed += MainWindow_Closed;
     }
@@ -113,6 +116,7 @@ public partial class MainWindow : Window
 
     private void MainWindow_Closed(object? sender, EventArgs e)
     {
+        StopWatching();
         var handle = new WindowInteropHelper(this).Handle;
         foreach (var id in _registeredHotkeys)
             UnregisterHotKey(handle, id);
@@ -125,6 +129,8 @@ public partial class MainWindow : Window
     internal void RefreshDestinations()
     {
         DestinationsPanel.Children.Clear();
+        var lastUsed = State.Config.Destinations
+            .Where(d => d.LastUsedUtc is not null).MaxBy(d => d.LastUsedUtc)?.Id;
         foreach (var dest in OrderedDestinations())
         {
             var isChild = dest.ParentId is not null;
@@ -140,13 +146,15 @@ public partial class MainWindow : Window
                     Children =
                     {
                         new TextBlock { Text = dest.Icon, FontSize = 15, Margin = new Thickness(0, 0, 6, 0) },
-                        new TextBlock { Text = (isChild ? "↳ " : "") + dest.Name, VerticalAlignment = VerticalAlignment.Center },
+                        new TextBlock { Text = (dest.IsFavorite ? "★ " : "") + (isChild ? "↳ " : "") + dest.Name, VerticalAlignment = VerticalAlignment.Center },
                     },
                 },
             };
             if (!string.IsNullOrWhiteSpace(dest.ColorHex) &&
                 ColorConverter.ConvertFromString(dest.ColorHex) is Color color)
                 button.Background = new SolidColorBrush(color);
+            else if (dest.Id == lastUsed)
+                button.Background = (System.Windows.Media.Brush)FindResource("AccentSoft"); // last-used highlight
 
             button.Click += DestinationButton_Click;
             button.DragOver += (s, e) => { if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effects = DragDropEffects.Move; };
@@ -188,6 +196,10 @@ public partial class MainWindow : Window
         }
 
         Item("Open folder", () => OpenFolder(dest.ExpandedPath));
+        Item(dest.IsFavorite ? "★ Unpin favourite" : "☆ Pin as favourite", () =>
+        {
+            dest.IsFavorite = !dest.IsFavorite; State.Save(); RefreshDestinations();
+        });
         Item("Rename…", () =>
         {
             var name = Dialogs.Prompt("Rename destination", "New name:", dest.Name);
@@ -273,11 +285,17 @@ public partial class MainWindow : Window
 
         SetStatus($"Moving {files.Count} item(s) to {dest.Name}…");
         var result = await TransferHelper.RunTransferWithProgressAsync(this, files, dest, mode, conflict);
+        if (result.Succeeded > 0)
+            State.RecordDestinationUsed(dest);
         SetStatus(result.Cancelled
             ? $"⏹ Cancelled — {result.Succeeded} item(s) already moved to {dest.Name} (↶ Undo reverses them)"
             : $"✓ {result.Succeeded} item(s) → {dest.Name}" +
               (result.SkippedCount > 0 ? $" · {result.SkippedCount} skipped (already existed)" : "") +
               (result.Failed > 0 ? $" · {result.Failed} failed: {FirstError(result)}" : ""));
+        if (!result.Cancelled && result.Succeeded > 0)
+            ToastWindow.Show($"✓ {result.Succeeded} item(s) → {dest.Name}" +
+                (result.Failed > 0 ? $" · {result.Failed} failed: {FirstError(result)}" : ""),
+                onUndo: () => _ = UndoLast());
         RefreshActivity();
     }
 
@@ -356,6 +374,13 @@ public partial class MainWindow : Window
 
         if (preview.Count == 0) { SetStatus("Nothing to organize — everything is already in place."); return; }
 
+        // Dry run (recommendation 6): the preview IS the result — nothing moves.
+        if (DryRunCheck.IsChecked == true)
+        {
+            SetStatus($"Dry run — {preview.Count} file(s) · {PathHelpers.FormatSize(preview.Sum(p => p.SizeBytes))} would move. Nothing moved.");
+            return;
+        }
+
         List<PreviewItem> confirmed = preview;
         if (State.Config.Preferences.ConfirmBeforeOrganize)
         {
@@ -375,6 +400,8 @@ public partial class MainWindow : Window
               (result.SkippedCount > 0 ? $" · {result.SkippedCount} skipped" : "") +
               (result.Failed > 0 ? $" · {result.Failed} failed: {FirstError(result)}" : "") +
               "  (↶ Undo reverses this)");
+        if (!result.Cancelled && result.Succeeded > 0)
+            ToastWindow.Show($"✓ Organized {result.Succeeded} file(s)", onUndo: () => _ = UndoLast());
         RefreshActivity();
     }
 
@@ -425,13 +452,95 @@ public partial class MainWindow : Window
 
     private void QuickBarBtn_Click(object sender, RoutedEventArgs e) => QuickBarWindow.ShowBar();
 
+    private void WheelBtn_Click(object sender, RoutedEventArgs e) => DestinationWheelWindow.ShowWheel();
+
+    private void HistoryBtn_Click(object sender, RoutedEventArgs e) =>
+        new UndoHistoryWindow { Owner = this }.ShowDialog();
+
+    private void DropZone_DragOver(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effects = DragDropEffects.Move;
+    }
+
+    private void DropZone_Drop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(DataFormats.FileDrop) is string[] dropped)
+            DestinationWheelWindow.ShowWheel(dropped.Where(p => File.Exists(p) || Directory.Exists(p)).ToList());
+    }
+
+    // ---------- Watch folder (recommendation 6) ----------
+
+    private FileSystemWatcher? _watcher;
+    private readonly HashSet<string> _watchQueue = new(StringComparer.OrdinalIgnoreCase);
+    private System.Windows.Threading.DispatcherTimer? _watchTimer;
+
+    private void WatchCheck_Changed(object sender, RoutedEventArgs e)
+    {
+        // Fires once during XAML load too — only persist/react after the window exists.
+        if (!IsLoaded && WatchCheck.IsChecked is null) return;
+        State.Config.Preferences.WatchDownloads = WatchCheck.IsChecked == true;
+        State.Save();
+        if (WatchCheck.IsChecked == true) StartWatching(); else StopWatching();
+    }
+
+    private void StartWatching()
+    {
+        StopWatching();
+        var downloads = KnownFolder.Downloads;
+        if (!Directory.Exists(downloads)) return;
+        _watcher = new FileSystemWatcher(downloads) { EnableRaisingEvents = true, IncludeSubdirectories = false };
+        _watcher.Created += (_, args) =>
+        {
+            lock (_watchQueue) _watchQueue.Add(args.FullPath);
+            Dispatcher.Invoke(() =>
+            {
+                _watchTimer ??= new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+                _watchTimer.Tick -= WatchTimer_Tick;
+                _watchTimer.Tick += WatchTimer_Tick;
+                _watchTimer.Start(); // debounce: wait for the download to finish writing
+            });
+        };
+        SetStatus($"Watching Downloads — new files will auto-sort (Undo still works).");
+    }
+
+    private void StopWatching()
+    {
+        _watchTimer?.Stop();
+        if (_watcher is not null) { _watcher.EnableRaisingEvents = false; _watcher.Dispose(); _watcher = null; }
+    }
+
+    private async void WatchTimer_Tick(object? sender, EventArgs e)
+    {
+        _watchTimer?.Stop();
+        List<string> queued;
+        lock (_watchQueue) { queued = _watchQueue.ToList(); _watchQueue.Clear(); }
+        var downloads = KnownFolder.Downloads;
+        List<PreviewItem> preview;
+        try
+        {
+            preview = await Task.Run(() => QuickBarWindow.CreateEngine()
+                .BuildPreview(downloads, State.Config.Preferences.IncludeSubfolders))
+                .ContinueWith(t => t.Result.Where(p => queued.Contains(p.SourcePath, StringComparer.OrdinalIgnoreCase)).ToList());
+        }
+        catch { return; }
+        if (preview.Count == 0) return;
+        var result = await TransferHelper.RunApplyWithProgressAsync(this,
+            preview.Select(p => (p.SourcePath, p.DestinationPath)).ToList(),
+            State.Config.Preferences.DefaultTransferMode, State.Config.Preferences.DefaultConflictPolicy);
+        SetStatus($"Auto-sorted {result.Succeeded} new file(s) from Downloads (↶ Undo reverses this).");
+        ToastWindow.Show($"✓ Auto-sorted {result.Succeeded} new file(s) from Downloads", onUndo: () => _ = UndoLast());
+        RefreshActivity();
+    }
+
     private void SettingsBtn_Click(object sender, RoutedEventArgs e)
     {
         new SettingsWindow() { Owner = this }.ShowDialog();
         RefreshDestinations();
     }
 
-    private async void UndoBtn_Click(object sender, RoutedEventArgs e)
+    private async void UndoBtn_Click(object sender, RoutedEventArgs e) => await UndoLast();
+
+    internal async Task UndoLast()
     {
         try
         {

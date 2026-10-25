@@ -184,6 +184,12 @@ public partial class QuickBarWindow : Window
         }
 
         Item("Open folder", () => MainWindow.OpenFolder(dest.ExpandedPath));
+        Item(dest.IsFavorite ? "★ Unpin favourite" : "☆ Pin as favourite", () =>
+        {
+            dest.IsFavorite = !dest.IsFavorite;
+            State.Save();
+            RefreshAll();
+        });
         Item("Rename destination…", () =>
         {
             var name = Dialogs.Prompt("Rename destination", "New name:", dest.Name);
@@ -222,6 +228,8 @@ public partial class QuickBarWindow : Window
         var result = items.Count >= 10 || items.Any(Directory.Exists)
             ? await TransferHelper.RunTransferWithProgressAsync(this, items, dest, mode, conflict)
             : await Task.Run(() => State.Ops.TransferFiles(items, dest.ExpandedPath, mode, conflict));
+        if (result.Succeeded > 0)
+            State.RecordDestinationUsed(dest);
         ShowResult($"→ {dest.Name}", result);
     }
 
@@ -238,6 +246,8 @@ public partial class QuickBarWindow : Window
             var result = items.Count >= 10 || items.Any(Directory.Exists)
                 ? await TransferHelper.RunTransferWithProgressAsync(this, items, dest, mode, conflict)
                 : await Task.Run(() => State.Ops.TransferFiles(items, dest.ExpandedPath, mode, conflict));
+            if (result.Succeeded > 0)
+                State.RecordDestinationUsed(dest);
             ShowResult($"→ {dest.Name}", result);
         }
     }
@@ -314,6 +324,8 @@ public partial class QuickBarWindow : Window
         if (Application.Current.MainWindow is MainWindow main)
             main.RefreshActivity();
     }
+
+    private void Wheel_Click(object sender, RoutedEventArgs e) => DestinationWheelWindow.ShowWheel();
 
     private void Add_Click(object sender, RoutedEventArgs e)
     {
