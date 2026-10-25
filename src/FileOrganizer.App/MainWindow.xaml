@@ -13,6 +13,7 @@
         <!-- Header -->
         <DockPanel Grid.Row="0" LastChildFill="True">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <TextBlock x:Name="WatchDot" Text="● Watching Downloads" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="Collapsed" Foreground="{DynamicResource TextSecondary}"/>
                 <Button x:Name="WheelBtn" Content="◉ Wheel" FontWeight="Bold" Click="WheelBtn_Click"/>
                 <Button x:Name="QuickBarBtn" Content="▣ Quick Bar" Click="QuickBarBtn_Click"/>
                 <Button x:Name="UndoBtn" Content="↶ Undo Last" Click="UndoBtn_Click"/>
