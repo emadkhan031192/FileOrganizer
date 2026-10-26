@@ -64,5 +64,13 @@
             <Path Data="{StaticResource IconCheck}" Stroke="{DynamicResource GlassGreen}" StrokeThickness="3"
                   Width="32" Height="32" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"/>
         </Border>
+        <!-- Close button: the wheel is non-activating, so it never closes on
+             deactivation and previously had no mouse way to dismiss it at all
+             (Esc via the keyboard hook was the only exit). -->
+        <Button x:Name="CloseBtn" Width="28" Height="28" Canvas.Left="382" Canvas.Top="10"
+                Style="{StaticResource GlassPetalButton}" ToolTip="Close wheel (Esc)">
+            <Path Data="{StaticResource IconClose}" Fill="{DynamicResource GlassTextPrimary}"
+                  Width="14" Height="14" Stretch="Uniform"/>
+        </Button>
     </Canvas>
 </Window>

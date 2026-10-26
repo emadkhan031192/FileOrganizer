@@ -83,6 +83,7 @@ public partial class WheelWindow : Window
     private DispatcherTimer? _typeTimer;
     private DispatcherTimer? _dwellTimer;
     private DispatcherTimer? _dragAwayTimer;
+    private DispatcherTimer? _mouseAwayTimer;
     private bool _closing;
 
     [DllImport("user32.dll")]
@@ -115,10 +116,22 @@ public partial class WheelWindow : Window
             if (ReferenceEquals(Current, this)) Current = null;
             _dwellTimer?.Stop();
             _dragAwayTimer?.Stop();
+            _mouseAwayTimer?.Stop();
             _typeTimer?.Stop();
         };
         CentreLens.DragOver += (_, e) => { if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effects = DragDropEffects.Move; };
         CentreLens.Drop += Centre_Drop;
+        // Wheel-close fix (reported 2026-10-26: wheel stayed open, "should
+        // close after"): the wheel is non-activating, so it never closes on
+        // deactivation, and a drag that ends without a drop on a petal left
+        // it stuck. Now: an explicit close button, auto-close when the
+        // cursor leaves the window, and drag-leave from any part of the
+        // window (not just a petal) starts the drag-away timer.
+        CloseBtn.Click += (_, _) => CloseWheel();
+        MouseLeave += (_, _) => StartMouseAwayTimer();
+        DragLeave += (_, _) => StartDragAwayTimer();
+        CentreLens.DragLeave += (_, _) => StartDragAwayTimer();
+        CentreLens.MouseEnter += (_, _) => _mouseAwayTimer?.Stop();
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -343,8 +356,8 @@ public partial class WheelWindow : Window
         if (model.IsToggle && model.ToggleOn)
             button.Background = (Brush)FindResource("GlassAccentSoft");
 
-        button.MouseEnter += (_, _) => { HighlightPetal(IndexOf(button)); StartDwellTimer(model); };
-        button.MouseLeave += (_, _) => _dwellTimer?.Stop();
+        button.MouseEnter += (_, _) => { _mouseAwayTimer?.Stop(); HighlightPetal(IndexOf(button)); StartDwellTimer(model); };
+        button.MouseLeave += (_, _) => { _dwellTimer?.Stop(); StartMouseAwayTimer(); };
         button.Click += async (_, _) => await PressThenActivateAsync(model, null);
         button.DragOver += (_, e) =>
         {
@@ -678,6 +691,25 @@ public partial class WheelWindow : Window
         }
     }
 
+    /// <summary>Wheel-close fix: close when the cursor has genuinely left the window.
+    /// Applies to every wheel (not just drag wheels) — previously a wheel
+    /// opened by keyboard/orb had no mouse exit at all, so moving away left
+    /// it on screen until Esc. The 400 ms grace + position check keep a
+    /// stray leave event from closing the wheel while the cursor is still on it.</summary>
+    private void StartMouseAwayTimer()
+    {
+        _mouseAwayTimer?.Stop();
+        _mouseAwayTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(400) };
+        _mouseAwayTimer.Tick += (_, _) =>
+        {
+            _mouseAwayTimer?.Stop();
+            if (GetCursorPos(out var p)
+                && (p.X < Left - 10 || p.X > Left + Width + 10 || p.Y < Top - 10 || p.Y > Top + Height + 10))
+                CloseWheel();
+        };
+        _mouseAwayTimer.Start();
+    }
+
     private void StartDragAwayTimer()
     {
         if (!_fromDrag) return;
@@ -744,7 +776,14 @@ public partial class WheelWindow : Window
     {
         if (model.Destination is not Destination dest) return;
         var effective = EffectiveItems(items);
-        if (effective.Count == 0) { UpdateCentre(); return; }
+        // Dead end, not a stuck wheel: nothing to move, so close and say so
+        // instead of leaving the wheel on screen with no way forward.
+        if (effective.Count == 0)
+        {
+            CloseWheel();
+            ToastWindow.Show("Nothing selected — select a file in Explorer first, then open the wheel.");
+            return;
+        }
         var prefs = App.State.Config.Preferences;
         var mode = prefs.CopyInsteadOfMove ? TransferMode.Copy : prefs.DefaultTransferMode;
         var conflict = prefs.DefaultConflictPolicy;
@@ -766,7 +805,7 @@ public partial class WheelWindow : Window
         var folder = (items.Count == 1 && Directory.Exists(items[0]) ? items[0] : null)
             ?? ExplorerSelection.GetExplorerFolderPath()
             ?? Dialogs.PickFolder("Pick the folder to organize");
-        if (folder is null) return;
+        if (folder is null) { CloseWheel(); return; } // picker cancelled: close, don't strand the wheel
         List<PreviewItem> preview;
         try
         {
@@ -812,7 +851,7 @@ public partial class WheelWindow : Window
         var folder = (items.Count == 1 && Directory.Exists(items[0]) ? items[0] : null)
             ?? ExplorerSelection.GetExplorerFolderPath()
             ?? Dialogs.PickFolder("Pick the folder to check for duplicates");
-        if (folder is null) return Task.CompletedTask;
+        if (folder is null) { CloseWheel(); return Task.CompletedTask; } // picker cancelled: close, don't strand the wheel
         CloseWheel();
         new DuplicatesWindow(folder).ShowDialog();
         return Task.CompletedTask;
