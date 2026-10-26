@@ -150,29 +150,35 @@ public static class GlassTheme
         if (adaptiveTint && WallpaperTint.TryGetDominantColor(out var dominant))
             tintColor = dominant;
         var baseOpacity = dark ? 0.28 : 0.12;
-        if (resources["GlassTint"] is SolidColorBrush tint)
+        // CRASH FIX (reported 2026-10-26: "Cannot set a property on object
+        // '#FFFFFFFF' because it is in a read-only state" at startup, process
+        // left Suspended under Windows Problem Reporting with no window).
+        // Brushes loaded from a ResourceDictionary are frozen (read-only) on
+        // a real Windows machine — mutating GlassTint (white, #FFFFFFFF) or
+        // the accent brushes in place throws InvalidOperationException.
+        // Never mutate a resource brush: replace the dictionary entry with
+        // a fresh, unfrozen brush instead.
+        resources["GlassTint"] = new SolidColorBrush(tintColor)
         {
-            tint.Color = tintColor;
-            tint.Opacity = Math.Clamp(baseOpacity * intensity, 0.05, 0.45);
-        }
+            Opacity = Math.Clamp(baseOpacity * intensity, 0.05, 0.45),
+        };
 
         // Accent: user-picked hex, falling back to the default blue.
         if (TryParseHex(accentHex, out var accent))
         {
-            if (resources["GlassAccent"] is SolidColorBrush accentBrush) accentBrush.Color = accent;
-            if (resources["GlassAccentSoft"] is SolidColorBrush soft)
-            {
-                soft.Color = accent;
-                soft.Opacity = 0.15;
-            }
-            if (resources["GlassAccentHover"] is SolidColorBrush hover) hover.Color = Darken(accent, 0.85);
+            resources["GlassAccent"] = new SolidColorBrush(accent);
+            resources["GlassAccentSoft"] = new SolidColorBrush(accent) { Opacity = 0.15 };
+            resources["GlassAccentHover"] = new SolidColorBrush(Darken(accent, 0.85));
         }
     }
 
     private static void SetBrush(ResourceDictionary resources, string target, string source)
     {
+        // Clone, don't share: the source brush in the dictionary may be
+        // frozen, and sharing it would make any later mutation throw the
+        // same read-only error. Clone() returns a modifiable copy.
         if (resources[source] is Brush brush)
-            resources[target] = brush;
+            resources[target] = brush.Clone();
     }
 
     private static bool TryParseHex(string? hex, out Color color)
