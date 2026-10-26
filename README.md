@@ -120,6 +120,8 @@ installer/                 Inno Setup script + build-setup.bat      (§17)
 
 ## Deliberate scope notes
 
+- **Hub shell (Phase 3).** The main window is a glass hub, not tabs: a left nav rail switches one surface at a time (Move, Organize, Tools, Activity). The Organize preview is an inline sheet in the Organize panel — nothing moves until Organize is clicked there, and dry run opens the same sheet in preview-only mode. Results inside the hub surface as a live pill at the bottom with one-click Undo (replacing the toast for hub actions); the old PreviewWindow dialog is still used only by the `--organize` command-line flow. Engine, CLI, context menu, installer and CI behaviour are unchanged.
+
 - **Keyboard hook (Phase 2 wheel).** The wheel is a non-activating window, so it never has keyboard focus. A low-level keyboard hook (`KeyboardHook.cs`, `WheelHotkeyService.cs`) is therefore how arrows, Enter, Esc, letters and wheel-switch keys reach the wheel, and how Ctrl+` (configurable) and drag-flow wheel keys (Shift/Ctrl/Z) open it from Explorer. The hook never logs, stores or transmits keystrokes: it discards every key that is not a wheel key, passes everything through when no wheel is open except the hotkey — and only when Explorer or the Desktop is the foreground window. It is installed when the main window opens and removed when it closes. The older Alt+1..9 direct-move shortcuts still use RegisterHotKey and are unchanged.
 
 - **Why not a native Explorer toolbar/tab?** Modern Windows Explorer offers no supported API for third-party toolbars/tabs. The closest *reliable* integrations are the context menu and Send To, which is exactly what's implemented (§2 fallback strategy) — nothing patches or hooks Explorer internals.

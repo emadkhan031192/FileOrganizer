@@ -1,124 +1,212 @@
 <Window x:Class="FileOrganizer.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="File Organizer — Explorer Companion" Width="900" Height="600" MinWidth="640" MinHeight="420"
+        Title="File Organizer" Width="960" Height="640" MinWidth="680" MinHeight="460"
         WindowStartupLocation="CenterScreen">
-    <Grid Margin="10">
+    <!-- Phase 3 hub shell: one job per surface, no tabs, no modal dialogs.
+         Left nav rail (Move / Organize / Tools / Activity) switches one panel
+         at a time. The Organize preview is an inline sheet in the Organize
+         panel, and results surface as the live pill at the bottom of the hub
+         (Undo is one click away on the pill itself). Icons are vector paths
+         from GlassIcons.xaml; no emoji icons are used in this shell. -->
+    <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="168"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
         <!-- Header -->
-        <DockPanel Grid.Row="0" LastChildFill="True">
+        <DockPanel Grid.Row="0" Grid.ColumnSpan="2" LastChildFill="True" Margin="0,0,0,12">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                <TextBlock x:Name="WatchDot" Text="● Watching Downloads" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="Collapsed" Foreground="{DynamicResource TextSecondary}"/>
-                <Button x:Name="WheelBtn" Content="◉ Wheel" FontWeight="Bold" Click="WheelBtn_Click"/>
-                <Button x:Name="QuickBarBtn" Content="▣ Quick Bar" Click="QuickBarBtn_Click"/>
-                <Button x:Name="UndoBtn" Content="↶ Undo Last" Click="UndoBtn_Click"/>
-                <Button x:Name="HistoryBtn" Content="🕘 History" Click="HistoryBtn_Click"/>
-                <Button x:Name="SettingsBtn" Content="⚙ Settings" Click="SettingsBtn_Click"/>
-                <Button x:Name="GalleryBtn" Content="Gallery" Click="GalleryBtn_Click"/>
+                <TextBlock x:Name="WatchDot" Text="Watching Downloads" VerticalAlignment="Center" Margin="0,0,8,0" Visibility="Collapsed" Foreground="{DynamicResource GlassTextSecondary}"/>
+                <Button x:Name="WheelBtn" Content="Wheel" Style="{StaticResource GlassButton}" Click="WheelBtn_Click"/>
+                <Button x:Name="QuickBarBtn" Content="Quick Bar" Style="{StaticResource GlassButton}" Click="QuickBarBtn_Click"/>
+                <Button x:Name="UndoBtn" Content="Undo Last" Style="{StaticResource GlassButton}" Click="UndoBtn_Click"/>
+                <Button x:Name="SettingsBtn" Content="Settings" Style="{StaticResource GlassButton}" Click="SettingsBtn_Click"/>
+                <Button x:Name="GalleryBtn" Content="Gallery" Style="{StaticResource GlassButton}" Click="GalleryBtn_Click"/>
             </StackPanel>
-            <TextBlock Text="FILE ORGANIZER" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
+            <TextBlock Text="FILE ORGANIZER" FontSize="18" FontWeight="Bold" VerticalAlignment="Center" Foreground="{DynamicResource GlassTextPrimary}"/>
         </DockPanel>
 
-        <!-- v2: one job per tab instead of every control on one crowded screen. -->
-        <TabControl Grid.Row="1" Margin="0,8,0,0">
-            <TabItem Header="① Move">
-                <StackPanel Margin="4">
-                    <TextBlock Text="Step 1 — Select files/folders in Explorer, or drop them below." TextWrapping="Wrap" FontWeight="SemiBold"/>
-                    <Border x:Name="DropZone" AllowDrop="True" BorderBrush="{DynamicResource CardBorder}" BorderThickness="1"
-                            CornerRadius="10" Padding="16" Margin="0,6,0,0" Background="{DynamicResource AccentSoft}"
+        <!-- Nav rail -->
+        <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource GlassCard}" Margin="0,0,12,0" VerticalAlignment="Top">
+            <StackPanel>
+                <Button x:Name="NavHomeBtn" Style="{StaticResource GlassPrimaryButton}" Click="NavHome_Click" HorizontalContentAlignment="Left">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource IconMove}" Fill="{DynamicResource GlassTextPrimary}" Width="18" Height="18" Stretch="Uniform" Margin="0,0,8,0"/>
+                        <TextBlock Text="Move" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="NavOrganizeBtn" Style="{StaticResource GlassButton}" Click="NavOrganize_Click" HorizontalContentAlignment="Left">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource IconOrganize}" Fill="{DynamicResource GlassTextPrimary}" Width="18" Height="18" Stretch="Uniform" Margin="0,0,8,0"/>
+                        <TextBlock Text="Organize" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="NavToolsBtn" Style="{StaticResource GlassButton}" Click="NavTools_Click" HorizontalContentAlignment="Left">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource IconTools}" Fill="{DynamicResource GlassTextPrimary}" Width="18" Height="18" Stretch="Uniform" Margin="0,0,8,0"/>
+                        <TextBlock Text="Tools" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="NavActivityBtn" Style="{StaticResource GlassButton}" Click="NavActivity_Click" HorizontalContentAlignment="Left">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Data="{StaticResource IconClock}" Fill="{DynamicResource GlassTextPrimary}" Width="18" Height="18" Stretch="Uniform" Margin="0,0,8,0"/>
+                        <TextBlock Text="Activity" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- Panels: exactly one visible at a time -->
+        <Grid Grid.Row="1" Grid.Column="1">
+            <!-- ===== Move / Home ===== -->
+            <ScrollViewer x:Name="HomePanel" VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <Border x:Name="DropZone" AllowDrop="True" Style="{StaticResource GlassCard}" Padding="20"
                             Drop="DropZone_Drop" DragOver="DropZone_DragOver">
-                        <TextBlock Text="📂  Drop files or folders here — the destination wheel opens. Or select in Explorer and click a destination below." TextWrapping="Wrap" TextAlignment="Center"/>
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="Drop files or folders here" FontSize="15" FontWeight="SemiBold" TextAlignment="Center" Foreground="{DynamicResource GlassTextPrimary}"/>
+                            <TextBlock Text="The destination wheel opens. Or select in Explorer, then pick a destination below." TextWrapping="Wrap" TextAlignment="Center" Margin="0,4,0,0" Foreground="{DynamicResource GlassTextSecondary}"/>
+                        </StackPanel>
                     </Border>
-                    <TextBlock Text="Step 2 — Click a destination (★ = favourite, highlighted = last used). Right-click a destination for Open / Rename / Favourite / Remove." TextWrapping="Wrap" Margin="0,10,0,0" FontWeight="SemiBold"/>
-                    <WrapPanel x:Name="DestinationsPanel" Margin="0,4,0,0"/>
-                    <WrapPanel Margin="0,8,0,0">
-                        <TextBlock Text=" Mode:" VerticalAlignment="Center" Margin="0,0,2,0"/>
-                        <ComboBox x:Name="TransferModeCombo" Width="70" SelectedIndex="0">
+                    <TextBlock Text="Destinations" FontWeight="SemiBold" Margin="0,16,0,0" Foreground="{DynamicResource GlassTextPrimary}"/>
+                    <TextBlock Text="Favourites first. Right-click a tile for Open, Rename, Favourite, Remove." Margin="0,2,0,0" Foreground="{DynamicResource GlassTextSecondary}"/>
+                    <WrapPanel x:Name="DestinationsPanel" Margin="0,8,0,0"/>
+                    <WrapPanel Margin="0,12,0,0">
+                        <TextBlock Text="Mode:" VerticalAlignment="Center" Margin="0,0,4,0" Foreground="{DynamicResource GlassTextSecondary}"/>
+                        <ComboBox x:Name="TransferModeCombo" Width="80" SelectedIndex="0">
                             <ComboBoxItem Tag="Move">Move</ComboBoxItem>
                             <ComboBoxItem Tag="Copy">Copy</ComboBoxItem>
                         </ComboBox>
-                        <TextBlock Text=" If exists:" VerticalAlignment="Center" Margin="8,0,2,0"/>
-                        <ComboBox x:Name="ConflictCombo" Width="110" SelectedIndex="0">
+                        <TextBlock Text="If exists:" VerticalAlignment="Center" Margin="12,0,4,0" Foreground="{DynamicResource GlassTextSecondary}"/>
+                        <ComboBox x:Name="ConflictCombo" Width="120" SelectedIndex="0">
                             <ComboBoxItem Tag="AutoRename">Auto-rename</ComboBoxItem>
                             <ComboBoxItem Tag="Skip">Skip</ComboBoxItem>
                             <ComboBoxItem Tag="Replace">Replace</ComboBoxItem>
                         </ComboBox>
                     </WrapPanel>
-                    <TextBlock Text="Step 3 — The move happens on click, with progress + Cancel for big moves, then a toast with Undo." TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{DynamicResource TextSecondary}"/>
+                    <TextBlock Text="Big moves show progress with Cancel, and partial batches stay undoable." TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{DynamicResource GlassTextTertiary}"/>
                 </StackPanel>
-            </TabItem>
+            </ScrollViewer>
 
-            <TabItem Header="② Organize">
-                <StackPanel Margin="4">
-                    <TextBlock Text="Step 1 — Pick the folder to sort." FontWeight="SemiBold"/>
+            <!-- ===== Organize ===== -->
+            <ScrollViewer x:Name="OrganizePanel" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock Text="Folder to sort" FontWeight="SemiBold" Foreground="{DynamicResource GlassTextPrimary}"/>
                     <DockPanel LastChildFill="True" Margin="0,6,0,0">
-                        <Button DockPanel.Dock="Right" Content="Browse…" Click="BrowseBtn_Click" Margin="6,0,0,0"/>
+                        <Button DockPanel.Dock="Right" Content="Browse…" Style="{StaticResource GlassButton}" Click="BrowseBtn_Click" Margin="6,0,0,0"/>
                         <ComboBox x:Name="RecentCombo" DockPanel.Dock="Right" Width="150" Margin="6,0,0,0" SelectionChanged="RecentCombo_SelectionChanged">
                             <ComboBox.ToolTip>Recent folders</ComboBox.ToolTip>
                         </ComboBox>
                         <TextBox x:Name="FolderBox" LostFocus="FolderBox_LostFocus"/>
                     </DockPanel>
-                    <TextBlock Text="Step 2 — Organize it." FontWeight="SemiBold" Margin="0,10,0,0"/>
-                    <WrapPanel Margin="0,6,0,0">
-                        <Button x:Name="OrganizeBtn" Content="⚡ ORGANIZE" FontWeight="Bold" Click="OrganizeBtn_Click"/>
-                        <Button x:Name="OrganizeDateBtn" Content="📅 ORGANIZE BY DATE" Click="OrganizeDateBtn_Click"/>
+                    <WrapPanel Margin="0,12,0,0">
+                        <Button x:Name="OrganizeBtn" Content="ORGANIZE" FontWeight="Bold" Style="{StaticResource GlassPrimaryButton}" Click="OrganizeBtn_Click"/>
+                        <Button x:Name="OrganizeDateBtn" Content="ORGANIZE BY DATE" Style="{StaticResource GlassButton}" Click="OrganizeDateBtn_Click"/>
                         <CheckBox x:Name="DryRunCheck" Content="Dry run — preview only, move nothing" VerticalAlignment="Center" Margin="12,0,0,0"/>
                     </WrapPanel>
-                    <CheckBox x:Name="WatchCheck" Content="Auto-sort new files in Downloads (watch folder — organized automatically, Undo still works)" Margin="0,8,0,0" Checked="WatchCheck_Changed" Unchecked="WatchCheck_Changed"/>
-                    <TextBlock Text="Sorted Documents profile — where your document types go:" FontWeight="SemiBold" Margin="0,12,0,0"/>
-                    <WrapPanel Margin="0,4,0,0">
-                        <Border CornerRadius="8" Background="{DynamicResource AccentSoft}" Padding="8,4" Margin="2"><TextBlock Text="PDF → Sorted Pdfs"/></Border>
-                        <Border CornerRadius="8" Background="{DynamicResource AccentSoft}" Padding="8,4" Margin="2"><TextBlock Text="Word → Sorted Word Files"/></Border>
-                        <Border CornerRadius="8" Background="{DynamicResource AccentSoft}" Padding="8,4" Margin="2"><TextBlock Text="Excel → Sorted Excel Files"/></Border>
-                        <Border CornerRadius="8" Background="{DynamicResource AccentSoft}" Padding="8,4" Margin="2"><TextBlock Text="PowerPoint → Sorted Powerpoint files"/></Border>
-                        <Border CornerRadius="8" Background="{DynamicResource AccentSoft}" Padding="8,4" Margin="2"><TextBlock Text="Text → Sorted Text"/></Border>
-                        <Border CornerRadius="8" Background="{DynamicResource AccentSoft}" Padding="8,4" Margin="2"><TextBlock Text="PSD → PSDs"/></Border>
-                        <Border CornerRadius="8" Background="{DynamicResource AccentSoft}" Padding="8,4" Margin="2"><TextBlock Text="Illustrator → Illustrator Files"/></Border>
-                        <Border CornerRadius="8" Background="{DynamicResource AccentSoft}" Padding="8,4" Margin="2"><TextBlock Text="HTML → Html Files"/></Border>
-                        <Border CornerRadius="8" Background="{DynamicResource AccentSoft}" Padding="8,4" Margin="2"><TextBlock Text="Affinity → Affinity designer"/></Border>
+                    <CheckBox x:Name="WatchCheck" Content="Auto-sort new files in Downloads" Margin="0,10,0,0" Checked="WatchCheck_Changed" Unchecked="WatchCheck_Changed"/>
+                    <TextBlock Text="Sorted Documents profile" FontWeight="SemiBold" Margin="0,16,0,0" Foreground="{DynamicResource GlassTextPrimary}"/>
+                    <WrapPanel Margin="0,6,0,0">
+                        <Border Style="{StaticResource GlassChip}" Margin="2"><TextBlock Text="PDF → Sorted Pdfs"/></Border>
+                        <Border Style="{StaticResource GlassChip}" Margin="2"><TextBlock Text="Word → Sorted Word Files"/></Border>
+                        <Border Style="{StaticResource GlassChip}" Margin="2"><TextBlock Text="Excel → Sorted Excel Files"/></Border>
+                        <Border Style="{StaticResource GlassChip}" Margin="2"><TextBlock Text="PowerPoint → Sorted Powerpoint files"/></Border>
+                        <Border Style="{StaticResource GlassChip}" Margin="2"><TextBlock Text="Text → Sorted Text"/></Border>
+                        <Border Style="{StaticResource GlassChip}" Margin="2"><TextBlock Text="PSD → PSDs"/></Border>
+                        <Border Style="{StaticResource GlassChip}" Margin="2"><TextBlock Text="Illustrator → Illustrator Files"/></Border>
+                        <Border Style="{StaticResource GlassChip}" Margin="2"><TextBlock Text="HTML → Html Files"/></Border>
+                        <Border Style="{StaticResource GlassChip}" Margin="2"><TextBlock Text="Affinity → Affinity designer"/></Border>
                     </WrapPanel>
-                    <TextBlock Text="Preview shows file count + total size (e.g. 12 files · 84 MB) and conflicts in red before anything moves." TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{DynamicResource TextSecondary}"/>
-                </StackPanel>
-            </TabItem>
 
-            <TabItem Header="③ Tools">
-                <StackPanel Margin="4">
+                    <!-- Preview sheet: inline, not a dialog. Nothing moves until Organize is clicked here. -->
+                    <Border x:Name="OrganizePreviewSheet" Style="{StaticResource GlassCard}" Margin="0,16,0,0" Visibility="Collapsed">
+                        <StackPanel>
+                            <TextBlock Text="Preview" FontWeight="SemiBold" Foreground="{DynamicResource GlassTextPrimary}"/>
+                            <TextBlock x:Name="PreviewSheetSummary" TextWrapping="Wrap" Margin="0,4,0,0" Foreground="{DynamicResource GlassTextSecondary}"/>
+                            <TextBlock Text="Uncheck anything to leave it in place. Conflicts are shown in red." Margin="0,2,0,8" Foreground="{DynamicResource GlassTextSecondary}"/>
+                            <ListBox x:Name="PreviewSheetList" Height="240" BorderThickness="0" Background="Transparent">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" Margin="0,2">
+                                            <CheckBox IsChecked="{Binding Included}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <TextBlock x:Name="FileNameText" Text="{Binding FileName}" Width="220" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding SizeText}" Width="70" VerticalAlignment="Center" Foreground="{DynamicResource GlassTextSecondary}"/>
+                                            <TextBlock Text="{Binding DestinationFolder}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Foreground="{DynamicResource GlassTextSecondary}"/>
+                                        </StackPanel>
+                                        <DataTemplate.Triggers>
+                                            <DataTrigger Binding="{Binding HasConflict}" Value="True">
+                                                <Setter TargetName="FileNameText" Property="Foreground" Value="#C0392B"/>
+                                                <Setter TargetName="FileNameText" Property="FontWeight" Value="SemiBold"/>
+                                            </DataTrigger>
+                                        </DataTemplate.Triggers>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                            <DockPanel LastChildFill="False" Margin="0,10,0,0">
+                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                    <Button x:Name="PreviewSheetCancelBtn" Content="Cancel" Style="{StaticResource GlassButton}" Click="PreviewSheetCancel_Click"/>
+                                    <Button x:Name="PreviewSheetOrganizeBtn" Content="Organize" FontWeight="Bold" Style="{StaticResource GlassPrimaryButton}" Click="PreviewSheetOrganize_Click"/>
+                                </StackPanel>
+                            </DockPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ===== Tools ===== -->
+            <ScrollViewer x:Name="ToolsPanel" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+                <StackPanel>
                     <WrapPanel>
-                        <Button x:Name="RenameBtn" Content="✏️ RENAME…" Click="RenameBtn_Click"/>
-                        <Button x:Name="SimpleRenameBtn" Content="✎ SIMPLE RENAME…" Click="SimpleRenameBtn_Click"/>
-                        <Button x:Name="DuplicatesBtn" Content="🔄 DUPLICATES" Click="DuplicatesBtn_Click"/>
-                        <Button x:Name="RulesBtn" Content="⚙ RULES" Click="RulesBtn_Click"/>
+                        <Button x:Name="RenameBtn" Content="RENAME…" Style="{StaticResource GlassButton}" Click="RenameBtn_Click"/>
+                        <Button x:Name="SimpleRenameBtn" Content="SIMPLE RENAME…" Style="{StaticResource GlassButton}" Click="SimpleRenameBtn_Click"/>
+                        <Button x:Name="DuplicatesBtn" Content="DUPLICATES" Style="{StaticResource GlassButton}" Click="DuplicatesBtn_Click"/>
+                        <Button x:Name="RulesBtn" Content="RULES" Style="{StaticResource GlassButton}" Click="RulesBtn_Click"/>
                     </WrapPanel>
-                    <DockPanel LastChildFill="True" Margin="0,10,0,0">
-                        <Button DockPanel.Dock="Right" Content="🔍 SEARCH" Click="SearchBtn_Click" Margin="6,0,0,0"/>
+                    <DockPanel LastChildFill="True" Margin="0,12,0,0">
+                        <Button DockPanel.Dock="Right" Content="SEARCH" Style="{StaticResource GlassButton}" Click="SearchBtn_Click" Margin="6,0,0,0"/>
                         <TextBox x:Name="SearchBox" KeyDown="SearchBox_KeyDown">
                             <TextBox.ToolTip>Search by file name (in the selected folder)…</TextBox.ToolTip>
                         </TextBox>
                     </DockPanel>
-                    <GroupBox Header="SEARCH RESULTS (double-click opens the folder)" Margin="0,8,0,0">
-                        <ListBox x:Name="SearchResultsList" Height="220" MouseDoubleClick="SearchResultsList_MouseDoubleClick"/>
+                    <GroupBox Header="SEARCH RESULTS (double-click opens the folder)" Margin="0,10,0,0">
+                        <ListBox x:Name="SearchResultsList" Height="240" MouseDoubleClick="SearchResultsList_MouseDoubleClick"/>
+                    </GroupBox>
+                    <TextBlock Text="Rename, duplicates, rules and search open their own screens from here; the hub stays underneath." TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{DynamicResource GlassTextTertiary}"/>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ===== Activity ===== -->
+            <ScrollViewer x:Name="ActivityPanel" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock Text="Recent moves, newest first." TextWrapping="Wrap" Foreground="{DynamicResource GlassTextSecondary}"/>
+                    <Button Content="Open Full Undo History…" Style="{StaticResource GlassButton}" Click="HistoryBtn_Click" HorizontalAlignment="Left" Margin="0,10,0,0"/>
+                    <GroupBox Header="RECENT ACTIVITY" Margin="0,10,0,0">
+                        <ListBox x:Name="ActivityList" Height="320"/>
                     </GroupBox>
                 </StackPanel>
-            </TabItem>
+            </ScrollViewer>
+        </Grid>
 
-            <TabItem Header="🕘 History">
-                <StackPanel Margin="4">
-                    <TextBlock Text="Recent moves, newest first. For any batch — not just the last one — use History." TextWrapping="Wrap"/>
-                    <Button Content="🕘 Open Full Undo History…" Click="HistoryBtn_Click" HorizontalAlignment="Left" Margin="0,8,0,0"/>
-                    <GroupBox Header="RECENT ACTIVITY" Margin="0,8,0,0">
-                        <ListBox x:Name="ActivityList" Height="300"/>
-                    </GroupBox>
-                </StackPanel>
-            </TabItem>
-        </TabControl>
+        <!-- Live pill: floating result + one-click Undo, replaces the toast inside the hub. -->
+        <Border x:Name="LivePill" Grid.Row="1" Grid.ColumnSpan="2" Style="{StaticResource GlassPill}"
+                HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,16"
+                Visibility="Collapsed" Panel.ZIndex="10">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock x:Name="LivePillText" VerticalAlignment="Center" Foreground="{DynamicResource GlassTextPrimary}"/>
+                <Button x:Name="LivePillUndoBtn" Content="Undo" Style="{StaticResource GlassPrimaryButton}" Margin="12,0,0,0" Click="LivePillUndo_Click"/>
+                <Button x:Name="LivePillCloseBtn" Content="Dismiss" Style="{StaticResource GlassButton}" Margin="4,0,0,0" Click="LivePillClose_Click"/>
+            </StackPanel>
+        </Border>
 
-        <StatusBar Grid.Row="2" Margin="0,8,0,0">
-            <TextBlock x:Name="StatusText" Text="Ready. Tip: select files in Explorer, then click a destination — or open the ◉ Wheel."/>
+        <StatusBar Grid.Row="2" Grid.ColumnSpan="2" Margin="0,8,0,0">
+            <TextBlock x:Name="StatusText" Text="Ready. Tip: select files in Explorer, then click a destination — or open the Wheel."/>
         </StatusBar>
     </Grid>
 </Window>

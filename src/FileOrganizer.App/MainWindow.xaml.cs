@@ -43,7 +43,90 @@ public partial class MainWindow : Window
         // Phase 2 wheel entry: the low-level hook (scoped, never logs keys)
         // is what makes Ctrl+` and drag-flow wheel keys work from Explorer.
         Loaded += (_, _) => WheelHotkeyService.Start();
+        // Phase 3 hub backdrop: real DWM Mica on Windows 11 22H2+,
+        // fake-glass surface brush otherwise (same rule as the gallery).
+        Loaded += (_, _) => ApplyHubBackdrop();
     }
+
+    private void ApplyHubBackdrop()
+    {
+        var dark = Glass.BackdropHelper.ResolveTheme(State.Config.Preferences.Theme) == "Dark";
+        if (!Glass.BackdropHelper.TryApplyBackdrop(this, Glass.BackdropHelper.BackdropKind.Mica, dark))
+            Background = (System.Windows.Media.Brush)FindResource("GlassSurface");
+    }
+
+    // ---------- Phase 3 hub navigation: one panel visible at a time ----------
+
+    private void NavHome_Click(object sender, RoutedEventArgs e) => ShowPanel("Home");
+
+    private void NavOrganize_Click(object sender, RoutedEventArgs e) => ShowPanel("Organize");
+
+    private void NavTools_Click(object sender, RoutedEventArgs e) => ShowPanel("Tools");
+
+    private void NavActivity_Click(object sender, RoutedEventArgs e)
+    {
+        RefreshActivity();
+        ShowPanel("Activity");
+    }
+
+    private void ShowPanel(string panel)
+    {
+        HomePanel.Visibility = panel == "Home" ? Visibility.Visible : Visibility.Collapsed;
+        OrganizePanel.Visibility = panel == "Organize" ? Visibility.Visible : Visibility.Collapsed;
+        ToolsPanel.Visibility = panel == "Tools" ? Visibility.Visible : Visibility.Collapsed;
+        ActivityPanel.Visibility = panel == "Activity" ? Visibility.Visible : Visibility.Collapsed;
+        // The active nav item reads as the primary button; the rest stay glass.
+        NavHomeBtn.Style = (Style)FindResource(panel == "Home" ? "GlassPrimaryButton" : "GlassButton");
+        NavOrganizeBtn.Style = (Style)FindResource(panel == "Organize" ? "GlassPrimaryButton" : "GlassButton");
+        NavToolsBtn.Style = (Style)FindResource(panel == "Tools" ? "GlassPrimaryButton" : "GlassButton");
+        NavActivityBtn.Style = (Style)FindResource(panel == "Activity" ? "GlassPrimaryButton" : "GlassButton");
+        // The panel entrance is transform + opacity only (never size or hit area).
+        var visible = panel switch
+        {
+            "Organize" => (UIElement)OrganizePanel,
+            "Tools" => ToolsPanel,
+            "Activity" => ActivityPanel,
+            _ => HomePanel,
+        };
+        visible.Opacity = 0;
+        Glass.SpringAnimator.AnimateOpacity(visible, 1, Glass.SpringAnimator.SpringPreset.Gentle);
+    }
+
+    // ---------- Phase 3 live pill: the hub's result surface, Undo one click away ----------
+
+    private Action? _livePillUndo;
+    private System.Windows.Threading.DispatcherTimer? _livePillTimer;
+
+    /// <summary>Shows the live pill with an optional one-click Undo. Replaces ToastWindow inside the hub.</summary>
+    internal void ShowLivePill(string message, Action? onUndo = null)
+    {
+        _livePillUndo = onUndo;
+        LivePillText.Text = message;
+        LivePillUndoBtn.Visibility = onUndo is null ? Visibility.Collapsed : Visibility.Visible;
+        LivePill.Visibility = Visibility.Visible;
+        LivePill.Opacity = 0;
+        Glass.SpringAnimator.AnimateOpacity(LivePill, 1, Glass.SpringAnimator.SpringPreset.Snappy);
+        _livePillTimer?.Stop();
+        _livePillTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(8) };
+        _livePillTimer.Tick += (_, _) => HideLivePill();
+        _livePillTimer.Start();
+    }
+
+    internal void HideLivePill()
+    {
+        _livePillTimer?.Stop();
+        _livePillUndo = null;
+        LivePill.Visibility = Visibility.Collapsed;
+    }
+
+    private void LivePillUndo_Click(object sender, RoutedEventArgs e)
+    {
+        var undo = _livePillUndo;
+        HideLivePill();
+        undo?.Invoke();
+    }
+
+    private void LivePillClose_Click(object sender, RoutedEventArgs e) => HideLivePill();
 
     private void ShowFirstRunOnce()
     {
@@ -149,9 +232,11 @@ public partial class MainWindow : Window
         foreach (var dest in OrderedDestinations())
         {
             var isChild = dest.ParentId is not null;
+            // Phase 3: glass tiles with a vector folder icon (the stored
+            // dest.Icon emoji is no longer rendered in the hub).
             var button = new Button
             {
-                Style = (Style)FindResource("DestinationButton"),
+                Style = (Style)FindResource("GlassTileButton"),
                 Tag = dest,
                 AllowDrop = true,
                 Margin = isChild ? new Thickness(18, 4, 4, 4) : new Thickness(4),
@@ -160,7 +245,13 @@ public partial class MainWindow : Window
                     Orientation = Orientation.Horizontal,
                     Children =
                     {
-                        new TextBlock { Text = dest.Icon, FontSize = 15, Margin = new Thickness(0, 0, 6, 0) },
+                        new System.Windows.Shapes.Path
+                        {
+                            Data = (Geometry)FindResource("IconFolder"),
+                            Fill = (System.Windows.Media.Brush)FindResource("GlassTextPrimary"),
+                            Width = 18, Height = 18, Stretch = Stretch.Uniform,
+                            Margin = new Thickness(0, 0, 8, 0),
+                        },
                         new TextBlock { Text = (dest.IsFavorite ? "★ " : "") + (isChild ? "↳ " : "") + dest.Name, VerticalAlignment = VerticalAlignment.Center },
                     },
                 },
@@ -169,7 +260,7 @@ public partial class MainWindow : Window
                 ColorConverter.ConvertFromString(dest.ColorHex) is Color color)
                 button.Background = new SolidColorBrush(color);
             else if (dest.Id == lastUsed)
-                button.Background = (System.Windows.Media.Brush)FindResource("AccentSoft"); // last-used highlight
+                button.Background = (System.Windows.Media.Brush)FindResource("GlassAccentSoft"); // last-used highlight
 
             button.Click += DestinationButton_Click;
             button.DragOver += (s, e) => { if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effects = DragDropEffects.Move; };
@@ -178,7 +269,25 @@ public partial class MainWindow : Window
             DestinationsPanel.Children.Add(button);
         }
 
-        var add = new Button { Content = "+ Add Destination", Style = (Style)FindResource("DestinationButton") };
+        var add = new Button
+        {
+            Style = (Style)FindResource("GlassTileButton"),
+            Content = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Children =
+                {
+                    new System.Windows.Shapes.Path
+                    {
+                        Data = (Geometry)FindResource("IconPlus"),
+                        Fill = (System.Windows.Media.Brush)FindResource("GlassTextPrimary"),
+                        Width = 18, Height = 18, Stretch = Stretch.Uniform,
+                        Margin = new Thickness(0, 0, 8, 0),
+                    },
+                    new TextBlock { Text = "Add Destination", VerticalAlignment = VerticalAlignment.Center },
+                },
+            },
+        };
         add.Click += AddDestination_Click;
         DestinationsPanel.Children.Add(add);
 
@@ -186,8 +295,22 @@ public partial class MainWindow : Window
         {
             var recycle = new Button
             {
-                Content = "🗑 Recycle Bin",
-                Style = (Style)FindResource("DestinationButton"),
+                Style = (Style)FindResource("GlassTileButton"),
+                Content = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Children =
+                    {
+                        new System.Windows.Shapes.Path
+                        {
+                            Data = (Geometry)FindResource("IconRecycle"),
+                            Fill = (System.Windows.Media.Brush)FindResource("GlassTextPrimary"),
+                            Width = 18, Height = 18, Stretch = Stretch.Uniform,
+                            Margin = new Thickness(0, 0, 8, 0),
+                        },
+                        new TextBlock { Text = "Recycle Bin", VerticalAlignment = VerticalAlignment.Center },
+                    },
+                },
                 AllowDrop = true,
                 Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFE, 0xE2, 0xE2)),
                 ToolTip = "Send selected file(s)/folder(s) to the Windows Recycle Bin (restore from there, not via Undo)",
@@ -196,7 +319,7 @@ public partial class MainWindow : Window
             {
                 var items = ExplorerSelection.GetSelectedFiles();
                 if (items.Count == 0) { SetStatus("Nothing selected in Explorer to recycle."); return; }
-                ToastWindow.Show(await RecycleBinService.RecycleAsync(items));
+                ShowLivePill(await RecycleBinService.RecycleAsync(items));
                 RefreshActivity();
             };
             recycle.DragOver += (s, e) => { if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effects = DragDropEffects.Move; };
@@ -206,7 +329,7 @@ public partial class MainWindow : Window
                 {
                     var items = dropped.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
                     if (items.Count == 0) return;
-                    ToastWindow.Show(await RecycleBinService.RecycleAsync(items));
+                    ShowLivePill(await RecycleBinService.RecycleAsync(items));
                     RefreshActivity();
                 }
             };
@@ -339,7 +462,7 @@ public partial class MainWindow : Window
               (result.SkippedCount > 0 ? $" · {result.SkippedCount} skipped (already existed)" : "") +
               (result.Failed > 0 ? $" · {result.Failed} failed: {FirstError(result)}" : ""));
         if (!result.Cancelled && result.Succeeded > 0)
-            ToastWindow.Show($"✓ {result.Succeeded} item(s) → {dest.Name}" +
+            ShowLivePill($"✓ {result.Succeeded} item(s) → {dest.Name}" +
                 (result.Failed > 0 ? $" · {result.Failed} failed: {FirstError(result)}" : ""),
                 onUndo: () => _ = UndoLast());
         RefreshActivity();
@@ -420,22 +543,104 @@ public partial class MainWindow : Window
 
         if (preview.Count == 0) { SetStatus("Nothing to organize — everything is already in place."); return; }
 
-        // Dry run (recommendation 6): the preview IS the result — nothing moves.
-        if (DryRunCheck.IsChecked == true)
+        // Phase 3: no modal preview dialog in the hub. With confirmation on,
+        // the preview opens as an inline sheet in the Organize panel; dry run
+        // opens the same sheet in preview-only mode (nothing moves).
+        // With confirmation off, the old direct-apply behaviour is preserved.
+        if (State.Config.Preferences.ConfirmBeforeOrganize || DryRunCheck.IsChecked == true)
         {
-            SetStatus($"Dry run — {preview.Count} file(s) · {PathHelpers.FormatSize(preview.Sum(p => p.SizeBytes))} would move. Nothing moved.");
+            ShowPreviewSheet(preview, DryRunCheck.IsChecked == true);
             return;
         }
 
-        List<PreviewItem> confirmed = preview;
-        if (State.Config.Preferences.ConfirmBeforeOrganize)
-        {
-            var window = new PreviewWindow(preview) { Owner = this };
-            if (window.ShowDialog() != true) { SetStatus("Organize cancelled — nothing moved."); return; }
-            confirmed = window.ConfirmedItems;
-            if (confirmed.Count == 0) { SetStatus("Nothing selected — nothing moved."); return; }
-        }
+        await ApplyOrganizedAsync(preview);
+    }
 
+    // ---------- Phase 3 Organize preview sheet (inline, not a dialog) ----------
+
+    private List<PreviewItem> _sheetPreview = new();
+    private bool _sheetDryRun;
+
+    private void ShowPreviewSheet(List<PreviewItem> preview, bool dryRun)
+    {
+        _sheetPreview = preview;
+        _sheetDryRun = dryRun;
+        var conflicts = preview.Count(p => p.HasConflict);
+        PreviewSheetSummary.Text = $"{preview.Count} file(s) · {PathHelpers.FormatSize(preview.Sum(p => p.SizeBytes))}" +
+            (conflicts > 0 ? $" · {conflicts} name conflict(s), shown in red" : "") +
+            (dryRun ? " · Dry run — nothing will move" : "");
+        PreviewSheetOrganizeBtn.Content = dryRun ? "Close Preview" : "Organize";
+        PreviewSheetList.ItemsSource = preview;
+        OrganizePreviewSheet.Visibility = Visibility.Visible;
+        // Sheet entrance: translate + opacity only. First rows fade in
+        // staggered (~15 ms apart) once the list has laid out its containers.
+        OrganizePreviewSheet.Opacity = 0;
+        Glass.SpringAnimator.AnimateOpacity(OrganizePreviewSheet, 1, Glass.SpringAnimator.SpringPreset.Gentle);
+        SetStatus(dryRun
+            ? "Dry run preview — nothing moved."
+            : "Preview ready — check the sheet, then Organize.");
+        Dispatcher.BeginInvoke(new Action(StaggerPreviewRows),
+            System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    private void StaggerPreviewRows()
+    {
+        try
+        {
+            var index = 0;
+            var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(15) };
+            timer.Tick += (_, _) =>
+            {
+                if (index >= 12 || index >= _sheetPreview.Count)
+                {
+                    timer.Stop();
+                    return;
+                }
+                if (PreviewSheetList.ItemContainerGenerator.ContainerFromIndex(index) is UIElement row)
+                    Glass.SpringAnimator.AnimateOpacity(row, 1, Glass.SpringAnimator.SpringPreset.Snappy);
+                index++;
+            };
+            // Start rows invisible so the stagger is visible; containers that
+            // are not yet generated are simply left at full opacity.
+            for (var i = 0; i < Math.Min(12, _sheetPreview.Count); i++)
+            {
+                if (PreviewSheetList.ItemContainerGenerator.ContainerFromIndex(i) is UIElement row)
+                    row.Opacity = 0;
+            }
+            timer.Start();
+        }
+        catch { /* Row stagger is cosmetic; the sheet itself already showed. */ }
+    }
+
+    private void HidePreviewSheet()
+    {
+        OrganizePreviewSheet.Visibility = Visibility.Collapsed;
+        PreviewSheetList.ItemsSource = null;
+        _sheetPreview = new();
+    }
+
+    private void PreviewSheetCancel_Click(object sender, RoutedEventArgs e)
+    {
+        HidePreviewSheet();
+        SetStatus("Organize cancelled — nothing moved.");
+    }
+
+    private async void PreviewSheetOrganize_Click(object sender, RoutedEventArgs e)
+    {
+        if (_sheetDryRun)
+        {
+            HidePreviewSheet();
+            SetStatus("Dry run — nothing moved.");
+            return;
+        }
+        var confirmed = _sheetPreview.Where(p => p.Included).ToList();
+        HidePreviewSheet();
+        if (confirmed.Count == 0) { SetStatus("Nothing selected — nothing moved."); return; }
+        await ApplyOrganizedAsync(confirmed);
+    }
+
+    private async Task ApplyOrganizedAsync(List<PreviewItem> confirmed)
+    {
         var mode = ParseEnum<TransferMode>(TransferModeCombo, TransferMode.Move);
         var conflict = ParseEnum<ConflictPolicy>(ConflictCombo, ConflictPolicy.AutoRename);
         var pairs = confirmed.Select(p => (p.SourcePath, p.DestinationPath)).ToList();
@@ -447,7 +652,7 @@ public partial class MainWindow : Window
               (result.Failed > 0 ? $" · {result.Failed} failed: {FirstError(result)}" : "") +
               "  (↶ Undo reverses this)");
         if (!result.Cancelled && result.Succeeded > 0)
-            ToastWindow.Show($"✓ Organized {result.Succeeded} file(s)", onUndo: () => _ = UndoLast());
+            ShowLivePill($"✓ Organized {result.Succeeded} file(s)", onUndo: () => _ = UndoLast());
         RefreshActivity();
     }
 
@@ -591,7 +796,7 @@ public partial class MainWindow : Window
             preview.Select(p => (p.SourcePath, p.DestinationPath)).ToList(),
             State.Config.Preferences.DefaultTransferMode, State.Config.Preferences.DefaultConflictPolicy);
         SetStatus($"Auto-sorted {result.Succeeded} new file(s) from Downloads (↶ Undo reverses this).");
-        ToastWindow.Show($"✓ Auto-sorted {result.Succeeded} new file(s) from Downloads", onUndo: () => _ = UndoLast());
+        ShowLivePill($"✓ Auto-sorted {result.Succeeded} new file(s) from Downloads", onUndo: () => _ = UndoLast());
         RefreshActivity();
     }
 
