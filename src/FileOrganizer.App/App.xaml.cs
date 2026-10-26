@@ -24,6 +24,14 @@ public partial class App : Application
         ApplyTheme(State.Config.Preferences);
 
         var args = e.Args;
+        // Phase 1 gallery preview: opens only the design-system gallery, no hub, no bars.
+        if (args.Length > 0 && string.Equals(args[0], "--gallery", StringComparison.OrdinalIgnoreCase))
+        {
+            var gallery = new GalleryWindow();
+            MainWindow = gallery;
+            gallery.Show();
+            return;
+        }
         if (args.Length >= 2 &&
             string.Equals(args[0], "--organize", StringComparison.OrdinalIgnoreCase) &&
             System.IO.Directory.Exists(args[1]))
@@ -167,6 +175,11 @@ public partial class App : Application
     /// <summary>Applies Light/Dark theme + accent colour by swapping the DynamicResource brushes.</summary>
     public static void ApplyTheme(Core.AppPreferences prefs)
     {
+        // Phase 1: the glass system is the theme now (Light / Dark / Auto,
+        // accent, adaptive tint, intensity). The legacy brushes below stay
+        // for the pre-Phase-3 windows, which still use them.
+        Glass.GlassTheme.Apply(prefs.Theme, prefs.AccentHex, prefs.AdaptiveTint, prefs.GlassIntensity);
+        Glass.SpringAnimator.ReduceMotion = prefs.ReduceMotion;
         void Set(string key, string hex)
         {
             if (System.Windows.Media.ColorConverter.ConvertFromString(hex) is System.Windows.Media.Color c)

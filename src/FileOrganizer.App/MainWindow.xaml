@@ -19,6 +19,7 @@
                 <Button x:Name="UndoBtn" Content="↶ Undo Last" Click="UndoBtn_Click"/>
                 <Button x:Name="HistoryBtn" Content="🕘 History" Click="HistoryBtn_Click"/>
                 <Button x:Name="SettingsBtn" Content="⚙ Settings" Click="SettingsBtn_Click"/>
+                <Button x:Name="GalleryBtn" Content="Gallery" Click="GalleryBtn_Click"/>
             </StackPanel>
             <TextBlock Text="FILE ORGANIZER" FontSize="18" FontWeight="Bold" VerticalAlignment="Center"/>
         </DockPanel>

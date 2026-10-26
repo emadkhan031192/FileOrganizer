@@ -597,6 +597,9 @@ public partial class MainWindow : Window
         RefreshDestinations();
     }
 
+    /// <summary>Phase 1 gallery preview (design system only; the hub redesign is Phase 3).</summary>
+    private void GalleryBtn_Click(object sender, RoutedEventArgs e) => new GalleryWindow().Show();
+
     private async void UndoBtn_Click(object sender, RoutedEventArgs e) => await UndoLast();
 
     internal async Task UndoLast()
