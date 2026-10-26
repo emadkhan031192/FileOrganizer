@@ -37,15 +37,19 @@ public partial class MainWindow : Window
         WatchCheck.IsChecked = State.Config.Preferences.WatchDownloads;
         if (State.Config.Preferences.WatchDownloads)
             StartWatching();
-        Loaded += (_, _) => ShowFirstRunOnce();
+        // Startup-crash hotfix: an exception in a Loaded handler used to be
+        // an unhandled crash with no window and no error (the process sat
+        // "Suspended" under Windows Problem Reporting). Each handler now
+        // fails on its own and is logged, instead of killing the whole app.
+        Loaded += (_, _) => RunSafe(ShowFirstRunOnce);
         SourceInitialized += MainWindow_SourceInitialized;
         Closed += MainWindow_Closed;
         // Phase 2 wheel entry: the low-level hook (scoped, never logs keys)
         // is what makes Ctrl+` and drag-flow wheel keys work from Explorer.
-        Loaded += (_, _) => WheelHotkeyService.Start();
+        Loaded += (_, _) => RunSafe(WheelHotkeyService.Start);
         // Phase 3 hub backdrop: real DWM Mica on Windows 11 22H2+,
         // fake-glass surface brush otherwise (same rule as the gallery).
-        Loaded += (_, _) => ApplyHubBackdrop();
+        Loaded += (_, _) => RunSafe(ApplyHubBackdrop);
     }
 
     private void ApplyHubBackdrop()
@@ -53,6 +57,13 @@ public partial class MainWindow : Window
         var dark = Glass.BackdropHelper.ResolveTheme(State.Config.Preferences.Theme) == "Dark";
         if (!Glass.BackdropHelper.TryApplyBackdrop(this, Glass.BackdropHelper.BackdropKind.Mica, dark))
             Background = (System.Windows.Media.Brush)FindResource("GlassSurface");
+    }
+
+    /// <summary>Startup-crash hotfix: run a Loaded-time step, log it if it throws, keep the hub open.</summary>
+    private static void RunSafe(Action step)
+    {
+        try { step(); }
+        catch (Exception ex) { App.LogCrash(ex); }
     }
 
     // ---------- Phase 3 hub navigation: one panel visible at a time ----------

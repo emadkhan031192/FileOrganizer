@@ -17,11 +17,50 @@ public partial class App : Application
 {
     public static AppState State { get; private set; } = null!;
 
+    /// <summary>
+    /// Startup-crash diagnostics (hotfix after a silent crash was reported:
+    /// the process sat "Suspended" under Windows Problem Reporting with no
+    /// window and no error). Any startup failure is now written to
+    /// %AppData%\FileOrganizer\crash.log AND shown in a message box, instead
+    /// of dying silently under WER. The log write itself never throws.
+    /// </summary>
+    internal static void LogCrash(Exception ex)
+    {
+        try
+        {
+            var dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "FileOrganizer");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(Path.Combine(dir, "crash.log"),
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {ex.GetType().FullName}: {ex.Message}\n{ex.StackTrace}\n\n");
+        }
+        catch { /* Logging must never be the thing that crashes. */ }
+    }
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        State = new AppState();
-        ApplyTheme(State.Config.Preferences);
+        DispatcherUnhandledException += (_, args) =>
+        {
+            LogCrash(args.Exception);
+            MessageBox.Show($"File Organizer hit an error and could not continue:\n\n{args.Exception.Message}\n\nDetails were saved to %AppData%\\FileOrganizer\\crash.log — please send that file to support.",
+                "File Organizer", MessageBoxButton.OK, MessageBoxImage.Error);
+            args.Handled = true;
+            Shutdown();
+        };
+        try
+        {
+            State = new AppState();
+            ApplyTheme(State.Config.Preferences);
+        }
+        catch (Exception ex)
+        {
+            LogCrash(ex);
+            MessageBox.Show($"File Organizer could not start:\n\n{ex.Message}\n\nDetails were saved to %AppData%\\FileOrganizer\\crash.log — please send that file to support.",
+                "File Organizer", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown();
+            return;
+        }
 
         var args = e.Args;
         // Phase 1 gallery preview: opens only the design-system gallery, no hub, no bars.
@@ -47,15 +86,26 @@ public partial class App : Application
             return;
         }
         // No args (or unrecognised args): open the GUI.
+        // A failure here (e.g. a hub XAML/resource problem) used to be a
+        // silent WER crash with no window at all — now it is logged + shown.
+        try
+        {
+            var main = new MainWindow();
+            MainWindow = main;
+            main.Show();
 
-        var main = new MainWindow();
-        MainWindow = main;
-        main.Show();
-
-        if (State.Config.Preferences.ShowQuickBarOnStart)
-            QuickBarWindow.ShowBar();
-        if (State.Config.Preferences.EdgeBarEnabled)
-            EdgeBarWindow.ShowEdgeBar();
+            if (State.Config.Preferences.ShowQuickBarOnStart)
+                QuickBarWindow.ShowBar();
+            if (State.Config.Preferences.EdgeBarEnabled)
+                EdgeBarWindow.ShowEdgeBar();
+        }
+        catch (Exception ex)
+        {
+            LogCrash(ex);
+            MessageBox.Show($"File Organizer could not open its main window:\n\n{ex.Message}\n\nDetails were saved to %AppData%\\FileOrganizer\\crash.log — please send that file to support.",
+                "File Organizer", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown();
+        }
     }
 
     /// <summary>
