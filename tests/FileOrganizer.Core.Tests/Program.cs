@@ -275,14 +275,40 @@ try
         }
         """);
     var migrated = new ConfigService(oldPath).Load();
-    Check("v1 config migrates to schema 2 with safe glass defaults",
-        migrated.SchemaVersion == 2
+    Check("v1 config migrates to schema 3 with safe glass defaults",
+        migrated.SchemaVersion == 3
         && migrated.Preferences.GlassIntensity == 1.0
         && migrated.Preferences.ReduceMotion == false
         && migrated.Preferences.AdaptiveTint == false,
         $"version={migrated.SchemaVersion} intensity={migrated.Preferences.GlassIntensity}");
     Check("migration never overwrites the user's existing theme or accent",
         migrated.Preferences.Theme == "Dark" && migrated.Preferences.AccentHex == "#FF0000");
+    Check("v1 config migrates with safe wheel defaults",
+        migrated.Preferences.WheelHotkey == "Ctrl+`"
+        && migrated.Preferences.WheelMoveKey == "Shift"
+        && migrated.Preferences.OpenWheelOnDrag == true
+        && migrated.Preferences.CopyInsteadOfMove == false);
+
+    // ---------- Phase 2: SuggestionService ----------
+    var cvDest = new Destination { Id = "cv", Name = "Jobs/CV", Path = @"C:\Jobs\CV" };
+    var pdfDest = new Destination { Id = "pdf", Name = "Sorted Pdfs", Path = @"C:\Docs\Sorted Pdfs", IsFavorite = true };
+    var photosDest = new Destination { Id = "photos", Name = "Photos", Path = @"C:\Photos" };
+    var dests = new List<Destination> { pdfDest, photosDest, cvDest };
+    var suggestions = SuggestionService.Suggest(dests, new[] { @"C:\Downloads\my-cv.docx" },
+        new[] { new SuggestionService.HistorySample("report.pdf", "pdf") });
+    Check("suggestion picks the token-matching destination first",
+        suggestions.Count > 0 && suggestions[0].Destination.Id == "cv",
+        $"first={suggestions.FirstOrDefault()?.Destination.Id}");
+    Check("suggestion explains its reason from the filename",
+        suggestions.Count > 0 && suggestions[0].Reason.Contains("cv"));
+    var historyOnly = SuggestionService.Suggest(dests, new[] { @"C:\Downloads\notes.pdf" },
+        new[] { new SuggestionService.HistorySample("old.pdf", "pdf") });
+    Check("history suggests a destination for a repeated extension",
+        historyOnly.Any(s => s.Destination.Id == "pdf"));
+    var noMatch = SuggestionService.Suggest(dests, new[] { @"C:\Downloads\xyzq.abc" },
+        Array.Empty<SuggestionService.HistorySample>());
+    Check("no signal means no suggestion (nothing invented)",
+        noMatch.Count == 0);
 }
 finally
 {

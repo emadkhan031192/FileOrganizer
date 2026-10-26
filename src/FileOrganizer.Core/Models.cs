@@ -178,6 +178,29 @@ public sealed class AppPreferences
     /// <summary>Adaptive tint: tint glass with the wallpaper's dominant colour instead of plain white/black.</summary>
     public bool AdaptiveTint { get; set; }
 
+    // ----- Wheel (Phase 2 redesign) -----
+
+    /// <summary>Global wheel hotkey, e.g. "Ctrl+`": opens the Move wheel at the cursor with the Explorer selection.</summary>
+    public string WheelHotkey { get; set; } = "Ctrl+`";
+
+    /// <summary>Key that opens the Move wheel while dragging: "Shift" by default.</summary>
+    public string WheelMoveKey { get; set; } = "Shift";
+
+    /// <summary>Key that opens the Tools wheel while dragging: "Ctrl" by default.</summary>
+    public string WheelToolsKey { get; set; } = "Ctrl";
+
+    /// <summary>Key that opens the Actions wheel while dragging: "Z" by default.</summary>
+    public string WheelActionsKey { get; set; } = "Z";
+
+    /// <summary>Tap a wheel key while dragging files in Explorer to open that wheel at the cursor.</summary>
+    public bool OpenWheelOnDrag { get; set; } = true;
+
+    /// <summary>Press the global wheel hotkey with files selected in Explorer to open the wheel.</summary>
+    public bool OpenWheelFromKeyboard { get; set; } = true;
+
+    /// <summary>Tools wheel "Copy instead of move" toggle, persisted across sessions.</summary>
+    public bool CopyInsteadOfMove { get; set; }
+
     /// <summary>Accent colour as #RRGGBB used for primary buttons and highlights.</summary>
     public string AccentHex { get; set; } = "#2563EB";
 
@@ -225,7 +248,7 @@ public sealed class AppPreferences
 /// <summary>Everything File Organizer persists locally (destinations, rules, categories, presets, recent folders).</summary>
 public sealed class AppConfig
 {
-    public int SchemaVersion { get; set; } = 2;
+    public int SchemaVersion { get; set; } = 3;
     public List<Destination> Destinations { get; set; } = new();
     public List<ExtensionMapping> ExtensionMap { get; set; } = new();
     public List<OrganizeRule> Rules { get; set; } = new();
@@ -234,16 +257,16 @@ public sealed class AppConfig
     public AppPreferences Preferences { get; set; } = new();
 
     /// <summary>
-    /// Phase 1 migration: version 1 configs predate the glass preferences.
-    /// Their missing fields already get safe defaults from the property
-    /// initializers, so migration only bumps the version — it never overwrites
-    /// a theme, accent or any other choice the user already made.
-    /// Returns true when a migration ran.
+    /// Migration: version 1 configs predate the glass preferences, version 2
+    /// configs predate the wheel preferences. Missing fields already get safe
+    /// defaults from the property initializers, so migration only bumps the
+    /// version — it never overwrites a theme, accent, hotkey or any other
+    /// choice the user already made. Returns true when a migration ran.
     /// </summary>
     public bool Migrate()
     {
-        if (SchemaVersion >= 2) return false;
-        SchemaVersion = 2;
+        if (SchemaVersion >= 3) return false;
+        SchemaVersion = 3;
         return true;
     }
 
