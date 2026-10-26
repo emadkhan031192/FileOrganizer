@@ -164,8 +164,19 @@ public sealed class AppPreferences
     /// <summary>Quick Bar button size: "S", "M", or "L".</summary>
     public string QuickBarSize { get; set; } = "M";
 
-    /// <summary>UI theme: "Light" (default) or "Dark".</summary>
+    /// <summary>UI theme: "Light" (default), "Dark", or "Auto" (follow Windows).</summary>
     public string Theme { get; set; } = "Light";
+
+    // ----- Glass design system (Phase 1 redesign) -----
+
+    /// <summary>Glass intensity: scales tint opacity and shadow strength, 0.5 (subtle) to 1.5 (strong). 1.0 is the readable default.</summary>
+    public double GlassIntensity { get; set; } = 1.0;
+
+    /// <summary>Reduce motion: every animation becomes a 120 ms crossfade; transform changes snap instantly.</summary>
+    public bool ReduceMotion { get; set; }
+
+    /// <summary>Adaptive tint: tint glass with the wallpaper's dominant colour instead of plain white/black.</summary>
+    public bool AdaptiveTint { get; set; }
 
     /// <summary>Accent colour as #RRGGBB used for primary buttons and highlights.</summary>
     public string AccentHex { get; set; } = "#2563EB";
@@ -214,13 +225,27 @@ public sealed class AppPreferences
 /// <summary>Everything File Organizer persists locally (destinations, rules, categories, presets, recent folders).</summary>
 public sealed class AppConfig
 {
-    public int SchemaVersion { get; set; } = 1;
+    public int SchemaVersion { get; set; } = 2;
     public List<Destination> Destinations { get; set; } = new();
     public List<ExtensionMapping> ExtensionMap { get; set; } = new();
     public List<OrganizeRule> Rules { get; set; } = new();
     public List<RenamePreset> RenamePresets { get; set; } = new();
     public List<string> RecentFolders { get; set; } = new();
     public AppPreferences Preferences { get; set; } = new();
+
+    /// <summary>
+    /// Phase 1 migration: version 1 configs predate the glass preferences.
+    /// Their missing fields already get safe defaults from the property
+    /// initializers, so migration only bumps the version — it never overwrites
+    /// a theme, accent or any other choice the user already made.
+    /// Returns true when a migration ran.
+    /// </summary>
+    public bool Migrate()
+    {
+        if (SchemaVersion >= 2) return false;
+        SchemaVersion = 2;
+        return true;
+    }
 
     /// <summary>
     /// First-run config: the example destinations from the spec, pointing under the user's

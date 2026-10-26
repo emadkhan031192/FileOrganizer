@@ -46,7 +46,10 @@ public sealed class ConfigService
         try
         {
             var json = File.ReadAllText(ConfigPath);
-            return JsonSerializer.Deserialize<AppConfig>(json, JsonOptions) ?? AppConfig.CreateDefault();
+            var config = JsonSerializer.Deserialize<AppConfig>(json, JsonOptions) ?? AppConfig.CreateDefault();
+            if (config.Migrate())
+                Save(config); // persist the migrated version so it migrates once
+            return config;
         }
         catch (JsonException)
         {
@@ -74,8 +77,10 @@ public sealed class ConfigService
     public AppConfig Import(string sourcePath)
     {
         var json = File.ReadAllText(sourcePath);
-        return JsonSerializer.Deserialize<AppConfig>(json, JsonOptions)
+        var config = JsonSerializer.Deserialize<AppConfig>(json, JsonOptions)
                ?? throw new InvalidDataException("That file does not contain a File Organizer configuration.");
+        config.Migrate();
+        return config;
     }
 
     public void RememberFolder(AppConfig config, string folder)

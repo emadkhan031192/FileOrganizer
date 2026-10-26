@@ -253,6 +253,36 @@ try
     var imported = configService.Import(exportPath);
     Check("config export/import round-trips",
         imported.Destinations.Count == config.Destinations.Count && imported.Rules.Count == config.Rules.Count);
+
+    // ---------- Phase 1: SchemaVersion 2 migration ----------
+    var oldDir = Path.Combine(root, "migration");
+    Directory.CreateDirectory(oldDir);
+    var oldPath = Path.Combine(oldDir, "config.json");
+    File.WriteAllText(oldPath, """
+        {
+          "SchemaVersion": 1,
+          "Destinations": [],
+          "ExtensionMap": [],
+          "Rules": [],
+          "RenamePresets": [],
+          "RecentFolders": [],
+          "Preferences": {
+            "DefaultTransferMode": "Move",
+            "DefaultConflictPolicy": "AutoRename",
+            "Theme": "Dark",
+            "AccentHex": "#FF0000"
+          }
+        }
+        """);
+    var migrated = new ConfigService(oldPath).Load();
+    Check("v1 config migrates to schema 2 with safe glass defaults",
+        migrated.SchemaVersion == 2
+        && migrated.Preferences.GlassIntensity == 1.0
+        && migrated.Preferences.ReduceMotion == false
+        && migrated.Preferences.AdaptiveTint == false,
+        $"version={migrated.SchemaVersion} intensity={migrated.Preferences.GlassIntensity}");
+    Check("migration never overwrites the user's existing theme or accent",
+        migrated.Preferences.Theme == "Dark" && migrated.Preferences.AccentHex == "#FF0000");
 }
 finally
 {
