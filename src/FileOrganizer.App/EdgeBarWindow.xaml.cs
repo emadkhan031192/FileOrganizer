@@ -239,7 +239,7 @@ public partial class EdgeBarWindow : Window
         new RenameWizardWindow(items).ShowDialog();
     }
 
-    private void Wheel_Click(object sender, RoutedEventArgs e) => DestinationWheelWindow.ShowWheel();
+    private void Wheel_Click(object sender, RoutedEventArgs e) => WheelWindow.ShowMove();
 
     private void Settings_Click(object sender, RoutedEventArgs e)
     {

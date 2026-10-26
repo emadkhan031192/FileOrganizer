@@ -4,36 +4,27 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
-using FileOrganizer.Core;
+using FileOrganizer.App.Glass;
 
 namespace FileOrganizer.App;
 
 /// <summary>
-/// v4 orb: one truly circular floating button (64px, no rectangular bar) that grows into the
-/// 320 destination wheel in the same window, centred on the orb — so moving from the orb to a
-/// petal never loses hover. Hover 300ms (or drag files onto it) expands it; leaving for 300ms
-/// collapses it. Petals spring out staggered when animations are on; off = instant.
-/// Right-click the orb for Open / Settings / Exit orb mode / Hide.
+/// Phase 2 Orb layout: one idle floating glass orb (64px circle). It does not
+/// contain its own wheel any more — the unified WheelWindow owns all wheels.
+/// Hover 300 ms, click, touch-hold, or dropping files on the orb opens the
+/// Move wheel centred on the orb. Dragging the orb moves it; its position is
+/// persisted in Preferences.OrbCenterX/Y. Right-click: Open / Settings / Exit
+/// orb mode / Hide. Idle motion: the glow fades 0.25 to 0.55 over 1.8 s (sine,
+/// reverse) plus a light sweep across the surface every ~6 s; the glass visual
+/// scales to 1.06 on hover while the hit area stays the same size.
 /// </summary>
 public partial class OrbWindow : Window
 {
     private static OrbWindow? _instance;
-
-    private List<string> _items = new();
-    private int _page;
-    private bool _expanded;
-    private bool _transferring;
-    private bool _draggingOrb;
-    private DateTime _expandedAt = DateTime.MinValue;
     private DispatcherTimer? _hoverTimer;
-    private DispatcherTimer? _collapseTimer;
+    private DispatcherTimer? _sweepTimer;
     private Storyboard? _pulse;
-
-    [System.Runtime.InteropServices.DllImport("user32.dll")]
-    private static extern bool GetCursorPos(out CursorPoint point);
-
-    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
-    private struct CursorPoint { public int X, Y; }
+    private bool _draggingOrb;
 
     private OrbWindow()
     {
@@ -41,96 +32,100 @@ public partial class OrbWindow : Window
         var prefs = App.State.Config.Preferences;
         if (prefs.OrbCenterX is not null && prefs.OrbCenterY is not null)
         {
-            Left = prefs.OrbCenterX.Value - 32;
-            Top = prefs.OrbCenterY.Value - 32;
+            Left = prefs.OrbCenterX.Value - 40;
+            Top = prefs.OrbCenterY.Value - 40;
         }
         else
         {
-            Loaded += (_, _) =>
-            {
-                if (App.State.Config.Preferences.OrbCenterX is null)
-                {
-                    Left = (SystemParameters.WorkArea.Width - 64) / 2;
-                    Top = SystemParameters.WorkArea.Bottom - 64 - 12;
-                }
-            };
+            var wa = SystemParameters.WorkArea;
+            Left = wa.Right - 110;
+            Top = wa.Top + 40;
         }
-
-        OrbBorder.MouseEnter += (_, _) => StartHoverTimer();
-        OrbBorder.MouseLeave += (_, _) => StopHoverTimer();
-        OrbBorder.MouseLeftButtonDown += Orb_DragOrClick;
-        OrbBorder.ContextMenu = BuildOrbMenu();
-
-        WheelCanvas.MouseEnter += (_, _) => StopCollapseTimer();
-        WheelCanvas.MouseLeave += (_, _) => StartCollapseTimer();
-        KeyDown += (_, e) => { if (e.Key == Key.Escape && _expanded) Collapse(); };
-
-        DragEnter += (_, e) =>
+        Loaded += (_, _) => { StartPulse(); StartSweepTimer(); };
+        Closed += (_, _) =>
         {
-            if (e.Data.GetDataPresent(DataFormats.FileDrop)) { e.Effects = DragDropEffects.Move; Expand(); }
+            if (ReferenceEquals(_instance, this)) _instance = null;
+            _hoverTimer?.Stop();
+            _sweepTimer?.Stop();
+            _pulse?.Stop();
         };
-        DragLeave += (_, _) => StartCollapseTimer();
-        Drop += Window_Drop;
-
-        Loaded += (_, _) => StartPulse();
-        Closed += (_, _) => SaveCentre();
+        OrbBorder.MouseRightButtonUp += (_, _) => ShowContextMenu();
+        OrbBorder.TouchDown += (_, _) => StartHoverTimer();
+        OrbBorder.TouchUp += (_, _) => _hoverTimer?.Stop();
     }
 
     public static void ShowOrb()
     {
         _instance ??= new OrbWindow();
         _instance.Show();
-        _instance.StartPulse();
     }
 
     public static void HideOrb()
     {
-        if (_instance is null) return;
-        _instance.SaveCentre();
-        _instance.Hide();
+        _instance?.Hide();
     }
 
-    /// <summary>Called after Settings saves: orb on when wheel-only mode is on, off otherwise.</summary>
-    public static void RefreshIfExists()
+    private void StartHoverTimer()
     {
-        if (App.State.Config.Preferences.WheelOnlyMode)
-            ShowOrb();
-        else
-            HideOrb();
+        if (_draggingOrb) return;
+        _hoverTimer?.Stop();
+        _hoverTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
+        _hoverTimer.Tick += (_, _) => { _hoverTimer?.Stop(); OpenWheel(); };
+        _hoverTimer.Start();
     }
 
-    private ContextMenu BuildOrbMenu()
+    private void OpenWheel()
     {
-        var menu = new ContextMenu();
-        MenuItem Item(string header, Action action)
+        var centre = new Point(Left + Width / 2, Top + Height / 2);
+        var items = ExplorerSelection.GetSelectedFiles();
+        WheelWindow.Show(WheelWindow.WheelKind.Move, items, fromDrag: false, anchor: centre);
+    }
+
+    private void Orb_MouseEnter(object sender, MouseEventArgs e)
+    {
+        StartHoverTimer();
+        // Hover: the glass visual scales to 1.06; the hit area (the Border
+        // itself) does not change, because only the visual transform moves.
+        SpringAnimator.AnimateScale(OrbBorder, 1.06, SpringAnimator.SpringPreset.Snappy);
+    }
+
+    private void Orb_MouseLeave(object sender, MouseEventArgs e)
+    {
+        _hoverTimer?.Stop();
+        SpringAnimator.AnimateScale(OrbBorder, 1.0, SpringAnimator.SpringPreset.Snappy);
+    }
+
+    private void Orb_DragOrClick(object sender, MouseButtonEventArgs e)
+    {
+        _draggingOrb = true;
+        _hoverTimer?.Stop();
+        var startLeft = Left;
+        var startTop = Top;
+        try { DragMove(); } catch { /* drag cancelled */ }
+        _draggingOrb = false;
+        SaveCentre();
+        if (Math.Abs(Left - startLeft) < 4 && Math.Abs(Top - startTop) < 4)
+            OpenWheel();
+    }
+
+    private void Orb_DragOver(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetDataPresent(DataFormats.FileDrop))
         {
-            var item = new MenuItem { Header = header };
-            item.Click += (_, _) => action();
-            menu.Items.Add(item);
-            return item;
+            e.Effects = DragDropEffects.Move;
+            e.Handled = true;
         }
-        Item("🏠 Open File Organizer", () =>
+    }
+
+    private void Orb_Drop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(DataFormats.FileDrop) is string[] dropped)
         {
-            if (Application.Current.MainWindow is MainWindow main) { main.Show(); main.Activate(); }
-        });
-        Item("⚙ Open Settings…", () =>
-        {
-            if (Application.Current.MainWindow is MainWindow main)
-            {
-                main.Show(); main.Activate();
-                new SettingsWindow { Owner = main }.ShowDialog();
-                RefreshIfExists();
-            }
-        });
-        Item("◉ Exit orb mode (back to bar)", () =>
-        {
-            App.State.Config.Preferences.WheelOnlyMode = false;
-            App.State.Save();
-            HideOrb();
-            QuickBarWindow.ShowBar();
-        });
-        Item("Hide orb", () => Hide());
-        return menu;
+            var items = dropped.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
+            if (items.Count == 0) return;
+            var centre = new Point(Left + Width / 2, Top + Height / 2);
+            WheelWindow.Show(WheelWindow.WheelKind.Move, items, fromDrag: false, anchor: centre);
+        }
     }
 
     private void SaveCentre()
@@ -141,48 +136,42 @@ public partial class OrbWindow : Window
         App.State.Save();
     }
 
-    private void StartHoverTimer()
+    private void ShowContextMenu()
     {
-        if (_draggingOrb) return;
-        StopHoverTimer();
-        _hoverTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
-        _hoverTimer.Tick += (_, _) => { StopHoverTimer(); Expand(); };
-        _hoverTimer.Start();
-    }
-
-    private void StopHoverTimer() { _hoverTimer?.Stop(); _hoverTimer = null; }
-
-    private void StartCollapseTimer()
-    {
-        StopCollapseTimer();
-        _collapseTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
-        _collapseTimer.Tick += (_, _) =>
+        var menu = new ContextMenu();
+        var open = new MenuItem { Header = "Open File Organizer" };
+        open.Click += (_, _) =>
         {
-            StopCollapseTimer();
-            // Stability: a stray MouseLeave (window resize, a child animating) must not collapse
-            // the wheel while the cursor is actually still inside it. Only collapse on a real exit.
-            if (_transferring || _draggingOrb) return;
-            if ((DateTime.Now - _expandedAt).TotalMilliseconds < 500) { StartCollapseTimer(); return; }
-            if (GetCursorPos(out var p) &&
-                p.X >= Left - 10 && p.X <= Left + Width + 10 &&
-                p.Y >= Top - 10 && p.Y <= Top + Height + 10)
-                return; // cursor still inside — a false leave event, ignore it
-            Collapse();
+            if (Application.Current.MainWindow is MainWindow main) { main.Show(); main.Activate(); }
         };
-        _collapseTimer.Start();
+        var settings = new MenuItem { Header = "Settings" };
+        settings.Click += (_, _) =>
+        {
+            if (Application.Current.MainWindow is MainWindow main)
+                new SettingsWindow { Owner = main }.ShowDialog();
+        };
+        var exit = new MenuItem { Header = "Exit orb mode" };
+        exit.Click += (_, _) =>
+        {
+            App.State.Config.Preferences.WheelOnlyMode = false;
+            App.State.Save();
+            Hide();
+            QuickBarWindow.RefreshIfExists();
+        };
+        var hide = new MenuItem { Header = "Hide" };
+        hide.Click += (_, _) => Hide();
+        menu.Items.Add(open);
+        menu.Items.Add(settings);
+        menu.Items.Add(exit);
+        menu.Items.Add(hide);
+        menu.PlacementTarget = OrbBorder;
+        menu.IsOpen = true;
     }
 
-    private void StopCollapseTimer() { _collapseTimer?.Stop(); _collapseTimer = null; }
-
-    /// <summary>
-    /// Stability fix: the old pulse scaled the orb itself, so at the orb's edge the mouse kept
-    /// entering/leaving as the orb grew and shrank — the flicker loop. The new pulse only fades
-    /// a hit-test-invisible glow behind the orb, so the hover area never changes size.
-    /// </summary>
     private void StartPulse()
     {
-        if (!App.State.Config.Preferences.EnableAnimations || _expanded) return;
-        StopPulse();
+        if (SpringAnimator.ReduceMotion) return;
+        _pulse?.Stop();
         var anim = new DoubleAnimation(0.25, 0.55, TimeSpan.FromSeconds(1.8))
         {
             AutoReverse = true,
@@ -196,260 +185,23 @@ public partial class OrbWindow : Window
         _pulse.Begin();
     }
 
-    private void StopPulse()
+    private void StartSweepTimer()
     {
-        _pulse?.Stop();
-        _pulse = null;
-        GlowBorder.Opacity = 0.35;
-    }
-
-    private void Orb_DragOrClick(object sender, MouseButtonEventArgs e)
-    {
-        _draggingOrb = true;
-        StopHoverTimer();
-        var startLeft = Left;
-        var startTop = Top;
-        try { DragMove(); } catch { /* window not yet shown / drag cancelled */ }
-        _draggingOrb = false;
-        SaveCentre();
-        // A click (no real drag) toggles the wheel; a drag just moves the orb.
-        // Expanding mid-drag resized the window under the cursor — another flicker source.
-        if (Math.Abs(Left - startLeft) < 4 && Math.Abs(Top - startTop) < 4)
+        _sweepTimer?.Stop();
+        _sweepTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(6) };
+        _sweepTimer.Tick += (_, _) =>
         {
-            if (_expanded) Collapse(); else Expand();
-        }
-    }
-
-    private void Expand()
-    {
-        if (_expanded) return;
-        StopPulse();
-        var cx = Left + Width / 2;
-        var cy = Top + Height / 2;
-        var wa = SystemParameters.WorkArea;
-        Width = 320; Height = 320;
-        Left = Math.Clamp(cx - 160, wa.Left, wa.Right - 320);
-        Top = Math.Clamp(cy - 160, wa.Top, wa.Bottom - 320);
-        _items = ExplorerSelection.GetSelectedFiles();
-        OrbBorder.Visibility = Visibility.Collapsed;
-        GlowBorder.Visibility = Visibility.Collapsed;
-        WheelCanvas.Visibility = Visibility.Visible;
-        _expanded = true;
-        _expandedAt = DateTime.Now;
-        BuildWheel();
-    }
-
-    private void Collapse()
-    {
-        if (!_expanded) return;
-        var cx = Left + Width / 2;
-        var cy = Top + Height / 2;
-        WheelCanvas.Visibility = Visibility.Collapsed;
-        OrbBorder.Visibility = Visibility.Visible;
-        GlowBorder.Visibility = Visibility.Visible;
-        Width = 64; Height = 64;
-        Left = cx - 32;
-        Top = cy - 32;
-        _expanded = false;
-        SaveCentre();
-        StartPulse();
-    }
-
-    private string DefaultCentreText => _items.Count == 0
-        ? "Nothing selected\nSelect files in Explorer,\nor drop files here"
-        : $"{_items.Count} item(s) ready";
-
-    private void BuildWheel()
-    {
-        foreach (var child in WheelCanvas.Children.OfType<Button>().ToList())
-            WheelCanvas.Children.Remove(child);
-        CenterText.Text = DefaultCentreText;
-
-        var destinations = App.State.Config.Destinations
-            .OrderByDescending(d => d.IsFavorite)
-            .ThenByDescending(d => d.LastUsedUtc)
-            .ThenBy(d => d.SortOrder)
-            .ToList();
-        var showRecycle = App.State.Config.Preferences.RecycleBinLocation is "Wheel" or "Both";
-
-        const int pageSize = 8;
-        var pages = Math.Max(1, (destinations.Count + pageSize - 1) / pageSize);
-        _page %= pages;
-        var pageDests = destinations.Skip(_page * pageSize).Take(pageSize).ToList();
-        var hasMore = pages > 1;
-        var shown = hasMore ? pageDests.Take(pageSize - 1).ToList() : pageDests;
-
-        // Slots: destinations (+ recycle petal, last) (+ ⋯ More when paging).
-        var slots = shown.Count + (showRecycle ? 1 : 0) + (hasMore ? 1 : 0);
-        if (slots == 0) return;
-        const double cx = 160, cy = 160, radius = 112, w = 64, h = 64;
-        var index = 0;
-
-        Button MakePetal(string icon, string toolTip, string? colorHex)
-        {
-            var button = new Button
+            if (SpringAnimator.ReduceMotion) return;
+            var translate = (System.Windows.Media.TranslateTransform)SweepBorder.RenderTransform;
+            translate.X = -64;
+            SweepBorder.Opacity = 0.5;
+            var anim = new DoubleAnimation(-64, 64, TimeSpan.FromMilliseconds(800))
             {
-                Style = (Style)FindResource("OrbPetalButton"),
-                Content = icon,
-                ToolTip = toolTip,
-                AllowDrop = true,
-                RenderTransformOrigin = new Point(0.5, 0.5),
-                RenderTransform = new System.Windows.Media.ScaleTransform(0, 0),
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut },
             };
-            button.DragOver += (_, e) => { if (e.Data.GetDataPresent(DataFormats.FileDrop)) e.Effects = DragDropEffects.Move; };
-            if (!string.IsNullOrWhiteSpace(colorHex) &&
-                System.Windows.Media.ColorConverter.ConvertFromString(colorHex) is System.Windows.Media.Color color)
-                button.Background = new System.Windows.Media.SolidColorBrush(color);
-            var angle = -Math.PI / 2 + index * 2 * Math.PI / slots;
-            Canvas.SetLeft(button, cx + radius * Math.Cos(angle) - w / 2);
-            Canvas.SetTop(button, cy + radius * Math.Sin(angle) - h / 2);
-            WheelCanvas.Children.Add(button);
-            index++;
-            return button;
-        }
-
-        foreach (var dest in shown)
-        {
-            var button = MakePetal(dest.Icon, $"{(dest.IsFavorite ? "★ " : "")}{dest.Name} — {dest.ExpandedPath}", dest.ColorHex);
-            button.Tag = dest;
-            button.Click += Petal_Click;
-            button.MouseEnter += (_, _) => CenterText.Text = (dest.IsFavorite ? "★ " : "") + dest.Name;
-            button.MouseLeave += (_, _) => CenterText.Text = DefaultCentreText;
-            button.Drop += Petal_Drop;
-        }
-
-        if (showRecycle)
-        {
-            var recycle = MakePetal("🗑", "Recycle Bin — sends files to the Windows Recycle Bin", "#DC2626");
-            recycle.Foreground = System.Windows.Media.Brushes.White;
-            recycle.Tag = "recycle";
-            recycle.Click += Recycle_Click;
-            recycle.MouseEnter += (_, _) => CenterText.Text = "🗑 Recycle Bin";
-            recycle.MouseLeave += (_, _) => CenterText.Text = DefaultCentreText;
-            recycle.Drop += Recycle_Drop;
-        }
-
-        if (hasMore)
-        {
-            var more = MakePetal("⋯", $"More destinations (page {_page + 1} of {pages})", null);
-            more.Tag = "more";
-            more.Click += (_, _) => { _page = (_page + 1) % pages; BuildWheel(); };
-        }
-
-        // Catchy Mac-style animation: petals spring out staggered from the centre.
-        var petals = WheelCanvas.Children.OfType<Button>().ToList();
-        if (App.State.Config.Preferences.EnableAnimations)
-        {
-            for (var i = 0; i < petals.Count; i++)
-            {
-                var scale = (System.Windows.Media.ScaleTransform)petals[i].RenderTransform;
-                var sb = new Storyboard();
-                foreach (var prop in new[] { "ScaleX", "ScaleY" })
-                {
-                    var anim = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(260))
-                    {
-                        BeginTime = TimeSpan.FromMilliseconds(i * 40),
-                        EasingFunction = new BackEase { Amplitude = 0.6, EasingMode = EasingMode.EaseOut },
-                    };
-                    Storyboard.SetTarget(anim, scale);
-                    Storyboard.SetTargetProperty(anim, new PropertyPath(prop));
-                    sb.Children.Add(anim);
-                }
-                sb.Begin();
-            }
-        }
-        else
-        {
-            foreach (var petal in petals)
-                if (petal.RenderTransform is System.Windows.Media.ScaleTransform s) { s.ScaleX = 1; s.ScaleY = 1; }
-        }
-    }
-
-    private void Window_Drop(object sender, DragEventArgs e)
-    {
-        if (e.Data.GetData(DataFormats.FileDrop) is string[] dropped)
-        {
-            _items = dropped.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
-            // Don't rebuild (and re-animate) the wheel on every drop — that was flicker too.
-            if (!_expanded) Expand(); else CenterText.Text = DefaultCentreText;
-        }
-    }
-
-    private async void Petal_Drop(object sender, DragEventArgs e)
-    {
-        if (sender is not Button { Tag: Destination dest }) return;
-        if (e.Data.GetData(DataFormats.FileDrop) is string[] dropped)
-            await MoveItemsAsync(dropped.Where(p => File.Exists(p) || Directory.Exists(p)).ToList(), dest);
-    }
-
-    private async void Petal_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button { Tag: Destination dest }) return;
-        if (_items.Count == 0)
-        {
-            _items = ExplorerSelection.GetSelectedFiles();
-            if (_items.Count == 0) { BuildWheel(); return; }
-        }
-        await MoveItemsAsync(_items, dest);
-    }
-
-    private async Task MoveItemsAsync(List<string> items, Destination dest)
-    {
-        _transferring = true;
-        try
-        {
-            var mode = App.State.Config.Preferences.DefaultTransferMode;
-            var conflict = App.State.Config.Preferences.DefaultConflictPolicy;
-            if (!await TransferHelper.ConfirmIfNeededAsync(this, items, dest.Name, mode)) return;
-            var result = items.Count >= 10 || items.Any(Directory.Exists)
-                ? await TransferHelper.RunTransferWithProgressAsync(this, items, dest, mode, conflict)
-                : await Task.Run(() => App.State.Ops.TransferFiles(items, dest.ExpandedPath, mode, conflict));
-            if (result.Succeeded > 0)
-                App.State.RecordDestinationUsed(dest);
-            Collapse();
-            if (Application.Current.MainWindow is MainWindow main)
-            {
-                main.RefreshActivity();
-                var firstFail = result.Files.FirstOrDefault(f => !f.Success && !f.Skipped);
-                ToastWindow.Show(
-                    $"✓ {result.Succeeded} item(s) → {dest.Name}" +
-                    (result.Failed > 0 ? $" · {result.Failed} failed: {firstFail?.Error}" : ""),
-                    onUndo: () => _ = main.UndoLast());
-            }
-        }
-        finally
-        {
-            _transferring = false;
-        }
-    }
-
-    private async void Recycle_Drop(object sender, DragEventArgs e)
-    {
-        if (e.Data.GetData(DataFormats.FileDrop) is string[] dropped)
-            await RecycleItemsAsync(dropped.Where(p => File.Exists(p) || Directory.Exists(p)).ToList());
-    }
-
-    private async void Recycle_Click(object sender, RoutedEventArgs e)
-    {
-        var items = _items.Count > 0 ? _items : ExplorerSelection.GetSelectedFiles();
-        if (items.Count == 0) { BuildWheel(); return; }
-        await RecycleItemsAsync(items);
-    }
-
-    private async Task RecycleItemsAsync(List<string> items)
-    {
-        _transferring = true;
-        try
-        {
-            var message = await RecycleBinService.RecycleAsync(items);
-            Collapse();
-            ToastWindow.Show(message); // no Undo: restore from the Windows Recycle Bin itself
-            if (Application.Current.MainWindow is MainWindow main)
-                main.RefreshActivity();
-        }
-        finally
-        {
-            _transferring = false;
-        }
+            anim.Completed += (_, _) => SweepBorder.Opacity = 0;
+            translate.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, anim);
+        };
+        _sweepTimer.Start();
     }
 }

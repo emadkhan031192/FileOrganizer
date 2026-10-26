@@ -120,6 +120,8 @@ installer/                 Inno Setup script + build-setup.bat      (§17)
 
 ## Deliberate scope notes
 
+- **Keyboard hook (Phase 2 wheel).** The wheel is a non-activating window, so it never has keyboard focus. A low-level keyboard hook (`KeyboardHook.cs`, `WheelHotkeyService.cs`) is therefore how arrows, Enter, Esc, letters and wheel-switch keys reach the wheel, and how Ctrl+` (configurable) and drag-flow wheel keys (Shift/Ctrl/Z) open it from Explorer. The hook never logs, stores or transmits keystrokes: it discards every key that is not a wheel key, passes everything through when no wheel is open except the hotkey — and only when Explorer or the Desktop is the foreground window. It is installed when the main window opens and removed when it closes. The older Alt+1..9 direct-move shortcuts still use RegisterHotKey and are unchanged.
+
 - **Why not a native Explorer toolbar/tab?** Modern Windows Explorer offers no supported API for third-party toolbars/tabs. The closest *reliable* integrations are the context menu and Send To, which is exactly what's implemented (§2 fallback strategy) — nothing patches or hooks Explorer internals.
 - **Why per-user (HKCU) registration?** No admin rights needed, the installer stays lightweight, and uninstall is clean.
 - **Where are the files stored?** Config/history live in `%AppData%\FileOrganizer\`. Nothing is uploaded anywhere; disable nothing, because there's nothing to disable — there's no network code at all.

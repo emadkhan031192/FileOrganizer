@@ -40,6 +40,9 @@ public partial class MainWindow : Window
         Loaded += (_, _) => ShowFirstRunOnce();
         SourceInitialized += MainWindow_SourceInitialized;
         Closed += MainWindow_Closed;
+        // Phase 2 wheel entry: the low-level hook (scoped, never logs keys)
+        // is what makes Ctrl+` and drag-flow wheel keys work from Explorer.
+        Loaded += (_, _) => WheelHotkeyService.Start();
     }
 
     private void ShowFirstRunOnce()
@@ -128,6 +131,7 @@ public partial class MainWindow : Window
     private void MainWindow_Closed(object? sender, EventArgs e)
     {
         StopWatching();
+        WheelHotkeyService.Stop();
         var handle = new WindowInteropHelper(this).Handle;
         foreach (var id in _registeredHotkeys)
             UnregisterHotKey(handle, id);
@@ -509,7 +513,7 @@ public partial class MainWindow : Window
 
     private void QuickBarBtn_Click(object sender, RoutedEventArgs e) => QuickBarWindow.ShowBar();
 
-    private void WheelBtn_Click(object sender, RoutedEventArgs e) => DestinationWheelWindow.ShowWheel();
+    private void WheelBtn_Click(object sender, RoutedEventArgs e) => WheelWindow.ShowMove();
 
     private void HistoryBtn_Click(object sender, RoutedEventArgs e) =>
         new UndoHistoryWindow { Owner = this }.ShowDialog();
@@ -522,7 +526,7 @@ public partial class MainWindow : Window
     private void DropZone_Drop(object sender, DragEventArgs e)
     {
         if (e.Data.GetData(DataFormats.FileDrop) is string[] dropped)
-            DestinationWheelWindow.ShowWheel(dropped.Where(p => File.Exists(p) || Directory.Exists(p)).ToList());
+            WheelWindow.ShowMove(dropped.Where(p => File.Exists(p) || Directory.Exists(p)).ToList());
     }
 
     // ---------- Watch folder (recommendation 6) ----------

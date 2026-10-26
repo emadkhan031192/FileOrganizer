@@ -26,7 +26,7 @@ public partial class QuickBarWindow : Window
         Drop += (_, e) =>
         {
             if (e.Data.GetData(DataFormats.FileDrop) is string[] dropped)
-                DestinationWheelWindow.ShowWheel(dropped.Where(p => File.Exists(p) || Directory.Exists(p)).ToList());
+                WheelWindow.ShowMove(dropped.Where(p => File.Exists(p) || Directory.Exists(p)).ToList());
         };
         // Auto-fade: translucent until hovered/dragged over.
         MouseEnter += (_, _) => Opacity = 1;
@@ -453,7 +453,7 @@ public partial class QuickBarWindow : Window
             main.RefreshActivity();
     }
 
-    private void Wheel_Click(object sender, RoutedEventArgs e) => DestinationWheelWindow.ShowWheel();
+    private void Wheel_Click(object sender, RoutedEventArgs e) => WheelWindow.ShowMove();
 
     private void Add_Click(object sender, RoutedEventArgs e)
     {

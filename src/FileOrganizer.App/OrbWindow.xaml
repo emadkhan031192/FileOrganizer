@@ -1,66 +1,40 @@
 <Window x:Class="FileOrganizer.App.OrbWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="File Organizer Orb" Width="64" Height="64"
-        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        Topmost="True" ShowInTaskbar="False" ShowActivated="False" AllowDrop="True">
-    <Window.Resources>
-        <Style x:Key="OrbPetalButton" TargetType="Button">
-            <Setter Property="Width" Value="64"/>
-            <Setter Property="Height" Value="64"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="FontSize" Value="22"/>
-            <!-- Glass neomorphism: soft light surface, white highlight edge, soft outer shadow. -->
-            <Setter Property="Background" Value="#F2F5F9"/>
-            <Setter Property="BorderBrush" Value="#FFFFFF"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1"
-                                CornerRadius="32">
-                            <Border.Effect>
-                                <DropShadowEffect BlurRadius="12" ShadowDepth="4" Opacity="0.22" Color="#8A94A6"/>
-                            </Border.Effect>
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource Accent}"/>
-                                <Setter Property="Foreground" Value="White"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#DDE3EC"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </Window.Resources>
-    <Grid x:Name="RootGrid">
-        <!-- Glass glow behind the orb: animated for the pulse, hit-test invisible so it can
-             never steal or change the orb's hover area (the old scale pulse did exactly that). -->
+        Title="File Organizer Orb" Width="80" Height="80"
+        WindowStyle="None" AllowsTransparency="True" Background="{x:Null}"
+        Topmost="True" ShowInTaskbar="False" ShowActivated="False" AllowDrop="True"
+        FontFamily="{StaticResource GlassFontFamily}">
+    <Grid x:Name="RootGrid" Width="80" Height="80">
+        <!-- Idle glow: fades only (never scales), so the hover area never changes size. -->
         <Border x:Name="GlowBorder" Width="72" Height="72" CornerRadius="36"
-                Background="#DCE6F5" Opacity="0.35" IsHitTestVisible="False"
+                Background="{DynamicResource GlassAccentSoft}" Opacity="0.35" IsHitTestVisible="False"
                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
-        <!-- Collapsed: one true circle, no rectangular bar behind it. Drag it to move it. -->
-        <Border x:Name="OrbBorder" Width="56" Height="56" CornerRadius="28"
-                Background="#EDF1F6" BorderBrush="#FFFFFF" BorderThickness="2"
-                HorizontalAlignment="Center" VerticalAlignment="Center">
-            <Border.Effect>
-                <DropShadowEffect BlurRadius="16" ShadowDepth="4" Opacity="0.28" Color="#8A94A6"/>
-            </Border.Effect>
-            <TextBlock Text="◉" FontSize="26" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <TextBlock.ToolTip>File Organizer — hover for the wheel, drag files here, click to open the wheel, right-click for options</TextBlock.ToolTip>
-            </TextBlock>
-        </Border>
-        <!-- Expanded: the same window, grown to the 320 wheel, centred on the orb. -->
-        <Canvas x:Name="WheelCanvas" Width="320" Height="320" Visibility="Collapsed">
-            <TextBlock x:Name="CenterText" Text="Drop files here" FontSize="12" FontWeight="Bold"
-                       TextAlignment="Center" Canvas.Left="95" Canvas.Top="138" Width="130" TextWrapping="Wrap"/>
-            <TextBlock Text="Hover a petal · Esc collapses" FontSize="9" TextAlignment="Center"
-                       Canvas.Left="70" Canvas.Top="182" Width="180" TextWrapping="Wrap"/>
-        </Canvas>
+        <!-- One true glass circle. Its clip keeps the light sweep inside the circle. -->
+        <Grid Width="64" Height="64" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Grid.Clip>
+                <EllipseGeometry Center="32,32" RadiusX="32" RadiusY="32"/>
+            </Grid.Clip>
+            <Border x:Name="OrbBorder" Style="{StaticResource GlassCard}" CornerRadius="32" Padding="0"
+                    MouseLeftButtonDown="Orb_DragOrClick" MouseEnter="Orb_MouseEnter" MouseLeave="Orb_MouseLeave"
+                    Drop="Orb_Drop" DragOver="Orb_DragOver">
+                <Path Data="{StaticResource IconWheel}" Fill="{DynamicResource GlassTextPrimary}"
+                      Width="28" Height="28" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <!-- Light sweep across the surface every ~6 s. -->
+            <Border x:Name="SweepBorder" Width="20" Height="64" Opacity="0" IsHitTestVisible="False"
+                    HorizontalAlignment="Left" VerticalAlignment="Center">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Color="#00FFFFFF" Offset="0"/>
+                        <GradientStop Color="#80FFFFFF" Offset="0.5"/>
+                        <GradientStop Color="#00FFFFFF" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Border.RenderTransform>
+                    <TranslateTransform X="-64"/>
+                </Border.RenderTransform>
+            </Border>
+        </Grid>
     </Grid>
 </Window>
